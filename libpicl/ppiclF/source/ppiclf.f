@@ -5365,655 +5365,303 @@
 !-----------------------------------------------------------------------
       SUBROUTINE ppiclf_comm_CreateBin
 !
-! This subroutine is called from ppiclf_solve_InitSolve
-!
       IMPLICIT NONE
 !
       INCLUDE "PPICLF"
 !
 ! Internal:
 !
-      INTEGER*4 ix, iy, iz, npt_total, i, idum, jdum, kdum, total_bin, 
-     >          targetTotBin, idealBin(3), Temp_iBin(3), iBin(3),
-     >          iBinTot, tempi,nBinMax,nBinMed,nBinMin, ppiclf_iglsum,
-     >          LBMax, LBMin, NBMax, ierr,MaxPotentialBins(3)  
-
-      REAL*8    xmin, ymin, zmin, xmax, ymax, zmax, temp1, temp2,
-     >          binb_length(3), BinMinLen(3), ppiclf_glmin,
-     >          ppiclf_glmax, ppiclf_glsum, periodicDistCheck,
-     >          BinBuffer(3)
-      EXTERNAL  ppiclf_iglsum, ppiclf_glmin, ppiclf_glmax, ppiclf_glsum
-
-      LOGICAL   BinLenCheck, NoReBin
-
-      ! Thierry - added for compatibility with code merge (temporary)
-      LOGICAL   ppiclf_binchanged, ppiclf_equaldomain(3)
-      REAL*8    ppiclf_previousbinb(6), ppiclf_bin_pos(2,3), 
-     >          ppiclf_nndist
+      INTEGER*4  el_face_num(18),el_edge_num(36),el_corner_num(24),
+     >                            nfacegp, nedgegp, ncornergp
+      INTEGER*4 ix, iy, iz, iperiodicx, iperiodicy, iperiodicz, 
+     >          npt_total, j, i, idum, jdum, kdum, total_bin, 
+     >          sum_value, count, targetTotBin, idealBin(3), iBin(3),
+     >          iBinTot, temp,nBinMax,nBinMed,nBinMin, m, l, k,
+     >          LBMax,LBMin
+      REAL*8 xmin, ymin, zmin, xmax, ymax, zmax, rduml, rdumr, rthresh,
+     >       rmiddle, rdiff, binb_length(3),temp1,temp2
+      INTEGER*4 ppiclf_iglsum
+      EXTERNAL ppiclf_iglsum
+      REAL*8 ppiclf_glmin,ppiclf_glmax,ppiclf_glsum
+      EXTERNAL ppiclf_glmin,ppiclf_glmax,ppiclf_glsum
 !
+
+! face, edge, and corner number, x,y,z are all inline, so stride=3
+      el_face_num = (/ -1,0,0, 1,0,0, 0,-1,0, 0,1,0, 0,0,-1, 0,0,1 /)
+      el_edge_num = (/ -1,-1,0 , 1,-1,0, 1,1,0 , -1,1,0 ,
+     >                  0,-1,-1, 1,0,-1, 0,1,-1, -1,0,-1,
+     >                  0,-1,1 , 1,0,1 , 0,1,1 , -1,0,1  /)
+      el_corner_num = (/
+     >                 -1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1,
+     >                 -1,-1,1,  1,-1,1,  1,1,1,  -1,1,1 /)
+
+      nfacegp   = 4  ! number of faces
+      nedgegp   = 4  ! number of edges
+      ncornergp = 0  ! number of corners
+
+      IF(ppiclf_ndim .GT. 2) THEN
+         nfacegp   = 6  ! number of faces
+         nedgegp   = 12 ! number of edges
+         ncornergp = 8  ! number of corners
+      END IF
 
       ix = 1
       iy = 2
-      iz = 3
+      iz = 1
+      IF(ppiclf_ndim .EQ. 3)
+     >iz = 3
+
+      iperiodicx = ppiclf_iperiodic(1)
+      iperiodicy = ppiclf_iperiodic(2)
+      iperiodicz = ppiclf_iperiodic(3)
         
-      ! iglsum is integer global sum across MPI ranks.
+      ! iglsum is integer addition across MPI ranks.
       npt_total = ppiclf_iglsum(ppiclf_npart,1)
-
-      ! Bin must be larger than nearest neighbor search distance
-      ! and the ppiclf_filter(1:3).  This makes a buffer around the bin
-      ! domain. Increase if you desire to bin less frequently.
-
-      ! Thierry - switched ppiclf_filter -> ppiclf_d2chk (original
-      ! version) for compatibility with original code
-
-      ppiclf_nndist = ppiclf_d2chk(3)
-      DO i = 1,3
-        BinMinLen(i) = MAX(ppiclf_d2chk(i),ppiclf_nndist)
-        ! Need ppiclf_filter to make sure you have layer of outer fluid cells
-        ! Need ppiclf_nndist/2 to ensure BinMinLen isn't violated
-        BinBuffer(i) = MAX(ppiclf_d2chk(i),ppiclf_nndist/2)
-      END DO
-
-  
-      xmin =  1D10
-      ymin =  1D10
-      zmin =  1D10
-      xmax = -1D10
-      ymax = -1D10
-      zmax = -1D10
-
+      ! compute bin boundaries
+      xmin = 1E10
+      ymin = 1E10
+      zmin = 1E10
+      xmax = -1E10
+      ymax = -1E10
+      zmax = -1E10
       ! Looping through particles on this processor
-      ! to find bin boundary locations
       DO i=1,ppiclf_npart
          ! Finding min/max particle extremes.
-         ! Add ppiclf_filt so that layers outer cells 
-         ! available for interpolation/projection.
-                   
-         temp1 = ppiclf_y(ix,i) - BinBuffer(1)
-         temp2 = ppiclf_y(ix,i) + BinBuffer(1)
-         IF(temp1 .LT. xmin) xmin = temp1
-         IF(temp2 .GT. xmax) xmax = temp2
+         ! Need to consider filter/neighborwidths
+         ! to ensure ppiclf_bins_dx > ppiclf_d2chk(1)
+         rduml = ppiclf_y(ix,i) - ppiclf_d2chk(1)
+         rdumr = ppiclf_y(ix,i) + ppiclf_d2chk(1)
+         IF(rduml .LT. xmin) xmin = rduml
+         IF(rdumr .GT. xmax) xmax = rdumr
 
-         temp1 = ppiclf_y(iy,i) - BinBuffer(2)
-         temp2 = ppiclf_y(iy,i) + BinBuffer(2)
-         IF(temp1 .LT. ymin) ymin = temp1
-         IF(temp2 .GT. ymax) ymax = temp2
+         rduml = ppiclf_y(iy,i) - ppiclf_d2chk(1)
+         rdumr = ppiclf_y(iy,i) + ppiclf_d2chk(1)
+         IF(rduml .LT. ymin) ymin = rduml
+         IF(rdumr .GT. ymax) ymax = rdumr
 
-         temp1 = ppiclf_y(iz,i) - BinBuffer(3)
-         temp2 = ppiclf_y(iz,i) + BinBuffer(3)
-         IF(temp1 .LT. zmin) zmin = temp1
-         IF(temp2 .GT. zmax) zmax = temp2
+         IF(ppiclf_ndim .EQ. 3) THEN
+            rduml = ppiclf_y(iz,i) - ppiclf_d2chk(1)
+            rdumr = ppiclf_y(iz,i) + ppiclf_d2chk(1)
+            IF(rduml .LT. zmin) zmin = rduml
+            IF(rdumr .GT. zmax) zmax = rdumr
+         END IF
       END DO
-      
       ! Finds global max/mins across MPI ranks
       ppiclf_binb(1) = ppiclf_glmin(xmin,1)
       ppiclf_binb(2) = ppiclf_glmax(xmax,1)
       ppiclf_binb(3) = ppiclf_glmin(ymin,1)
       ppiclf_binb(4) = ppiclf_glmax(ymax,1)
-      ppiclf_binb(5) = ppiclf_glmin(zmin,1)
-      ppiclf_binb(6) = ppiclf_glmax(zmax,1)
+      ppiclf_binb(5) = 0.0d0
+      ppiclf_binb(6) = 0.0d0
+      IF(ppiclf_ndim .GT. 2) ppiclf_binb(5) = ppiclf_glmin(zmin,1)
+      IF(ppiclf_ndim .GT. 2) ppiclf_binb(6) = ppiclf_glmax(zmax,1)
 
-      ! If all particles within last RK Stage binbound, do not calculate
-      ! bins again and do not remap overlap grid.
-      NoReBin = .TRUE.
-      !DO i = 1,6 - Thierry - bug
-      DO i = 1,3
-        IF(ppiclf_binb(2*i-1) .LT. ppiclf_previousbinb(2*i-1))
-     >    NoReBin = .FALSE.
-        IF(ppiclf_binb(2*i) .GT. ppiclf_previousbinb(2*i))
-     >    NoReBin = .FALSE.
-      END DO
-      IF(NoReBin) ppiclf_binchanged = .FALSE. 
-      IF(NoReBin) RETURN
+!      if (npt_total .gt. 0) then
+!      do i=1,ppiclf_ndim
+!         if (ppiclf_bins_balance(i) .eq. 1) then
+!            rmiddle = 0.0
+!            do j=1,ppiclf_npart
+!               rmiddle = rmiddle + ppiclf_y(i,j)
+!            enddo
+!            rmiddle = ppiclf_glsum(rmiddle,1)
+!            rmiddle = rmiddle/npt_total
+!
+!            rdiff =  max(abs(rmiddle-ppiclf_binb(2*(i-1)+1)),
+!     >                   abs(ppiclf_binb(2*(i-1)+2)-rmiddle))
+!            ppiclf_binb(2*(i-1)+1) = rmiddle - rdiff
+!            ppiclf_binb(2*(i-1)+2) = rmiddle + rdiff
+!         endif
+!      enddo
+!      endif
 
-      ! Ensuring ppiclf_binb not greater than 
-      ! cartesian fluid domain extremes.
-      ! If dist within ppiclf_nndist, set ppiclf_binb
-      ! equal to fluid domain for periodic ghost particles.
-      ! Needed to know when to use linear periodic
+       if (ppiclf_xdrange(2,1) .lt. ppiclf_binb(2) .or.
+     >    ppiclf_xdrange(1,1) .gt. ppiclf_binb(1) .or. 
+     >    iperiodicx .eq. 0) then
+         ppiclf_binb(1) = ppiclf_xdrange(1,1)
+         ppiclf_binb(2) = ppiclf_xdrange(2,1)
+       endif
+
+       if (ppiclf_xdrange(2,2) .lt. ppiclf_binb(4) .or.
+     >    ppiclf_xdrange(1,2) .gt. ppiclf_binb(3) .or.
+     >    iperiodicy .eq. 0) then
+         ppiclf_binb(3) = ppiclf_xdrange(1,2)
+         ppiclf_binb(4) = ppiclf_xdrange(2,2)
+       endif
       
-      ppiclf_EqualDomain(1) = .FALSE.
-      ppiclf_EqualDomain(2) = .FALSE.
-      ppiclf_EqualDomain(3) = .FALSE.
-
-      DO i = 1,3
-        ! Check bin min domain
-        periodicDistCheck = MAX(ppiclf_nndist,ppiclf_d2chk(i))
-        IF(ppiclf_binb(i*2-1) - periodicDistCheck .LE. 
-     >                          ppiclf_xdrange(1,i)) THEN
-          ppiclf_binb(i*2-1) = ppiclf_xdrange(1,i)
-          ppiclf_EqualDomain(i) = .TRUE.
-        END IF
-        ! Check bin max domain
-        IF(ppiclf_binb(i*2)+periodicDistCheck .GE. 
-     >                          ppiclf_xdrange(2,i)) THEN
-          ppiclf_binb(i*2) = ppiclf_xdrange(2,i)
-        ELSE
-          ppiclf_EqualDomain(i) = .FALSE.
-        END IF
-      END DO
-
-      ! Set Previous bin bound for next RK Stage check
-      DO i = 1,6
-        ppiclf_previousbinb(i) = ppiclf_binb(i)
-      END DO
+       if (ppiclf_ndim .gt. 2) then
+       if (ppiclf_xdrange(2,3) .lt. ppiclf_binb(6) .or.
+     >    ppiclf_xdrange(1,3) .gt. ppiclf_binb(5) .or. 
+     >    iperiodicz .eq. 0) then
+         ppiclf_binb(5) = ppiclf_xdrange(1,3)
+         ppiclf_binb(6) = ppiclf_xdrange(2,3)
+      endif ! ndim
+      endif ! xdrange
 
       ! End subroutine if no particles present      
       IF(npt_total .LT. 1) RETURN
-
-      !LB - length of bin
       LBMax = 0
       LBMin = 0
       temp1 = 1.0D-10
       temp2 = 1.0D10
       ! Find ppiclf bin domain lengths
       ! and Max,Med,Min dimensions
-      DO i = 1,3
-        binb_length(i) = ppiclf_binb(2*i) -
-     >                         ppiclf_binb(2*i-1)
-        IF(binb_length(i) .GT. temp1) THEN
-          temp1 = binb_length(i)
-          LBMax = i
+       DO l = 1,3
+        binb_length(l) = ppiclf_binb(2*l) -
+     >                         ppiclf_binb(2*l-1)
+        IF(binb_length(l).GT.temp1) THEN
+          temp1 = binb_length(l)
+          LBMax = l
         END IF
-        IF(binb_length(i) .LT. temp2) THEN
-          temp2 = binb_length(i)
-          LBMin = i
+        IF(binb_length(l).LT.temp2) THEN
+          temp2 = binb_length(l)
+          LBMin = l
         END IF
-      END DO
+       END DO
 
-!*** Start active bin iteration loop here      
-      ! Update with targetTotBin based on active/inactive
+       IF(ppiclf_ndim .LT. 3)
+     >   CALL ppiclf_exittr('CreateBins only supports 3D Grids',0.0D0,0)
+      
+      ! Update with targetTotBin = ActiveBinNum
       targetTotBin = ppiclf_np
-
-      DO i = 1,3
-        MaxPotentialBins(i) = FLOOR(binb_length(i)/BinMinLen(i))
-        IF(MaxPotentialBins(i) .LT. 1) THEN
-          CALL ppiclf_exittr('BinMinLen() criteria violated.',0.0D0,0)
-        END IF
-      END DO
 
       ! Number of bins calculated based on bin surface
       ! area minimization and bin aspect ratio close to 1
-      ppiclf_n_bins(1) = FLOOR((targetTotBin**(1.0D0/3.0D0))*
+       ppiclf_n_bins(1) = INT((targetTotBin**(1.0D0/3.0D0))*
      >                   (binb_length(1)**(2.0D0/3.0D0))/ 
      >                   ((binb_length(2)**(1.0D0/3.0D0))*
      >                   (binb_length(3))**(1.0D0/3.0D0)))
-      
-      ppiclf_n_bins(2) = FLOOR((targetTotBin**(1.0D0/3.0D0))*
+     
+      ppiclf_n_bins(2) = INT((targetTotBin**(1.0D0/3.0D0))*
      >                   (binb_length(2)**(2.0D0/3.0D0))/ 
      >                   ((binb_length(1)**(1.0D0/3.0D0))*
      >                   (binb_length(3))**(1.0D0/3.0D0)))
      
-      ppiclf_n_bins(3) = FLOOR((targetTotBin**(1.0D0/3.0D0))*
+      ppiclf_n_bins(3) = INT((targetTotBin**(1.0D0/3.0D0))*
      >                   (binb_length(3)**(2.0D0/3.0D0))/ 
      >                   ((binb_length(2)**(1.0D0/3.0D0))*
      >                   (binb_length(1))**(1.0D0/3.0D0)))
+      ! Since INT trucates, make sure n_bins at least 1 
+      DO l = 1,3
+        IF(ppiclf_n_bins(l) .LT. 1) ppiclf_n_bins(l) = 1
+      END DO
 
       iBinTot = 0
 
-      DO i = 1,3
-        IF(ppiclf_n_bins(i) .EQ. 0) ppiclf_n_bins(i) = 1
-        ! Ensure ppiclf_bin_dx(i) > BinMinLen(i) 
-        IF(ppiclf_n_bins(i) .GT. MaxPotentialBins(i)) THEN
-          ppiclf_n_bins(i) = MaxPotentialBins(i)
-        END IF
-      END DO
+      ! Filterwidth criteria check.  ppiclf_d2chk(2) automatically
+      ! set to be at least 2 fluid cell widths in
+      ! PICL_TEMP_InitSolver.F90
 
-      ! Since bin must be an integer, check -1, +0, +1 number of bins
-      ! for each bin dimension ideal number of bins will be max value
-      ! while less than number of total target of bins.
+       DO l = 1,3
+          ! Ensure ppiclf_bin_dx(l) > ppiclf_d2chk(1) 
+          if((binb_length(l)/ppiclf_n_bins(l)) .LT. ppiclf_d2chk(1)) 
+     >      ppiclf_n_bins(l) = INT(binb_length(l)/ppiclf_d2chk(1))
+          if(ppiclf_n_bins(l) .LT. 1) then
+            print*, "*** ERROR in ppiclf_CreateBin"
+            print*, "ppiclf_n_bins(l) =", ppiclf_n_bins(l), "l =", l
+            print*, "ppiclf_d2chk(1) =", ppiclf_d2chk(1)
+            CALL ppiclf_exittr('ppiclf_d2chk(1) criteria violated.',
+     >      0.0d0,0)
+          endif
+        idealBin(l) = ppiclf_n_bins(l)
+       END DO
+
+      ! Since bin must be an integer, check -1, +0, +1 number of bins for each bin dimension
+      ! ideal number of bins will be max value while less than number of total target of bins.
       ! Will not check total bin value (cycle do loop) if
-      ! BinMinLen(1:3) criteria is violated or ppiclf_n_bins < 1
+      ! ppiclf_d2chk(1) criteria is violated or ppiclf_n_bins < 1
 
       total_bin = 0 
-      DO ix = 1,4
+      DO ix = 1,3
         iBin(1) = ppiclf_n_bins(1) + (ix-2)
         ppiclf_bins_dx(1) = binb_length(1)/iBin(1)
-        IF(ppiclf_bins_dx(1) .LT. BinMinLen(1) .OR.
+        IF(ppiclf_bins_dx(1) .LT. ppiclf_d2chk(1) .OR.
      >                           iBin(1) .LT. 1) CYCLE
-        DO iy = 1,4
+        DO iy = 1,3
           iBin(2) = ppiclf_n_bins(2) + (iy-2)
           ppiclf_bins_dx(2) = binb_length(2)/iBin(2)
-          IF(ppiclf_bins_dx(2) .LT. BinMinLen(2) .OR.
+          IF(ppiclf_bins_dx(2) .LT. ppiclf_d2chk(1) .OR.
      >                             iBin(2) .LT. 1) CYCLE
-          DO iz = 1,4
+          DO iz = 1,3
             iBin(3) = ppiclf_n_bins(3) + (iz-2)
             ppiclf_bins_dx(3) = binb_length(3)/iBin(3)
-            IF(ppiclf_bins_dx(3) .LT. BinMinLen(3) .OR.
+            IF(ppiclf_bins_dx(3) .LT. ppiclf_d2chk(1) .OR.
      >                               iBin(3) .LT. 1) CYCLE
             iBinTot = iBin(1)*iBin(2)*iBin(3)
-            IF(iBinTot .GE. total_bin .AND.
+            IF(iBinTot .GT. total_bin .AND.
      >                     iBinTot .LE. targetTotBin) THEN
-              DO i = 1,3
-                Temp_iBin(i) = iBin(i)
+              total_bin = 1
+              DO l = 1,3
+                idealBin(l) = iBin(l)
+                total_bin = total_bin*idealBin(l)
               END DO
               ! These loops are to make sure the dimension with the longest
               ! ppiclf_binb length gets more bins in the case where two or
               ! more dimensions are within 1 bin division of each other.
-              ! BinLenCheck is a logical flag to ensure that the
-              ! BenMinLen is never violated.
-
-              tempi = 0
-              nBinMax = MAX(Temp_iBin(1),Temp_iBin(2),
-     >                      Temp_iBin(3))
-              nBinMin = MIN(Temp_iBin(1),Temp_iBin(2),
-     >                      Temp_iBin(3))
-              ! Dummy integer to see if Max,Med,Min different values
+              temp = 0
+              nBinMax = MAX(idealBin(1),idealBin(2),idealBin(3))
+              nBinMin = MIN(idealBin(1),idealBin(2),idealBin(3))
               nBinMed = -99
-              DO i = 1,3
-                IF(Temp_iBin(i).LT.nBinMax .AND. 
-     >             Temp_iBin(i).GT.nBinMin)
-     >             nBinMed = Temp_iBin(i)
+              DO l = 1,3
+                IF(idealBin(l).LT.nBinMax .AND. idealBin(l).GT.nBinMin)
+     >             nBinMed = idealBin(l)
               END DO
-              IF(nBinMed.EQ. -99) THEN 
-              ! Two or three number of bins are equal
-                DO i = 1,3
-                  IF(Temp_iBin(i).EQ.nBinMax) tempi = tempi + 1
-                  IF(Temp_iBin(i).EQ.nBinMin) tempi = tempi + 10
+              IF(nBinMed.EQ. -99) THEN !two number of bins are equal
+                DO l = 1,3
+                  IF(idealBin(l).EQ.nBinMax) temp = temp + 1
+                  IF(idealBin(l).EQ.nBinMin) temp = temp + 10
                 END DO
-                IF(tempi .EQ. 2) THEN
+                IF(temp .EQ. 2) THEN
                   nBinMed = nBinMax
                 ELSE ! Either two nBinMin or all 3 equal
                   nBinMed = nBinMin
                 END IF
               END IF
-              ! This combination violates BinMinLen condition if 
-              ! BinLenCheck .EQ. .FALSE.
-              BinLenCheck = .TRUE.
-              DO i = 1,3
-                IF(i .EQ. LBMax) THEN
-                  Temp_iBin(i)=nBinMax
-                  IF(binb_length(i)/Temp_iBin(i) .LT. BinMinLen(i))
-     >               BinLenCheck = .FALSE.
-                ELSE IF(i .EQ. LBMin) THEN
-                  Temp_iBin(i)=nBinMin
-                  IF(binb_length(i)/Temp_iBin(i) .LT. BinMinLen(i))
-     >               BinLenCheck = .FALSE.
+              DO l = 1,3
+                IF(l.EQ.LBMax) THEN
+                  idealBin(l)=nBinMax
+                ELSE IF(l.EQ.LBMin) THEN
+                  idealBin(l)=nBinMin
                 ELSE
-                  Temp_iBin(i)=nBinMed 
-                  IF(binb_length(i)/Temp_iBin(i) .LT. BinMinLen(i))
-     >               BinLenCheck = .FALSE.
+                  idealBin(l)=nBinMed 
                 END IF
-              END DO
-              IF(BinLenCheck) THEN
-                total_bin = 1
-                DO i = 1,3
-                  idealBin(i) = Temp_iBin(i)
-                  total_bin = total_bin*Temp_iBin(i)
-                END DO
-              END IF 
+              END DO 
             END IF
           END DO !iz
         END DO !iy
       END DO !ix
 
-
-      tempi = 0
-      total_bin = 1
-      DO i = 1,3
-        ! Set common ppiclf bin arrays based on above calculation
-        ppiclf_n_bins(i) = idealBin(i)
-        ppiclf_bins_dx(i) = binb_length(i)/ppiclf_n_bins(i)
-        total_bin = total_bin*ppiclf_n_bins(i)
-        IF(total_bin .GT. ppiclf_np) THEN
-          PRINT*, 'ERROR: Num Bins > NumProcessors',total_bin,ppiclf_np
-          CALL ppiclf_exittr('Error in Createbins',0.0,0)
-        END IF
-        IF(ppiclf_n_bins(i) .GT. tempi) THEN
-          NBMax = i ! Dimension with max number of bins
-          tempi = ppiclf_n_bins(i)
-        END IF
+      ! Set common ppiclf arrays based on above calculation
+      DO l = 1,3
+        ppiclf_n_bins(l) = idealBin(l)
+        ppiclf_bins_dx(l) = binb_length(l)/ppiclf_n_bins(l)
       END DO
+
 
       ! Loop to see if we can add one to dimension with largest number of bins
       ! Choose this dimension because it is smallest incremental increase to total bins 
       DO
-        IF((total_bin/ppiclf_n_bins(NBMax))*
-     >      (ppiclf_n_bins(NBMax)+1) .LT. targetTotBin) THEN
+        IF((total_bin/ppiclf_n_bins(LBMax))*
+     >      (ppiclf_n_bins(LBMax)+1) .LT. targetTotBin) THEN
           ! Add a bin and set new bin dx length
-          ppiclf_n_bins(NBMax) = ppiclf_n_bins(NBMax)+1
-          ppiclf_bins_dx(NBMax) = binb_length(NBMax)/
-     >                              ppiclf_n_bins(NBMax)
-          IF(ppiclf_bins_dx(NBMax) .LT. BinMinLen(NBMax)) THEN
-            ! If BinMinLen criteria violated, return to previous bin configuration
-            ppiclf_n_bins(NBMax) = ppiclf_n_bins(NBMax)-1
-            ppiclf_bins_dx(NBMax) = binb_length(NBMax)/
-     >                                ppiclf_n_bins(NBMax)
+          ppiclf_n_bins(LBMax) = ppiclf_n_bins(LBMax)+1
+          ppiclf_bins_dx(LBMax) = binb_length(LBMax)/
+     >                              ppiclf_n_bins(LBMax)
+          IF(ppiclf_bins_dx(LBMax) .LT. ppiclf_d2chk(1)) THEN
+            ! If ppiclf_d2chk criteria violated, return to previous bin configuration
+            ppiclf_n_bins(LBMax) = ppiclf_n_bins(LBMax)-1
+            ppiclf_bins_dx(LBMax) = binb_length(LBMax)/
+     >                                ppiclf_n_bins(LBMax)
             EXIT
           END IF
           total_bin = 1
-          DO i = 1,3
-            total_bin = total_bin*ppiclf_n_bins(i)
+          DO l = 1,3
+            total_bin = total_bin*ppiclf_n_bins(l)
           END DO
         ELSE
           EXIT
         END IF
       END DO
 
-! CALL ActiveBinCounter
-! End active bin check loop
-! CALL BinToProcessorMap
-      ! *** AVERY
-
-      ! Find this processor's x,y,z bin indicies
-      idum = modulo(ppiclf_nid,ppiclf_n_bins(1))
-      jdum = modulo(ppiclf_nid/ppiclf_n_bins(1),ppiclf_n_bins(2))
-      kdum = ppiclf_nid/(ppiclf_n_bins(1)*ppiclf_n_bins(2))
-
-      ! Calculate this processor's bin min/max position in each dimension.
-      ! Note that this value stays with this MPI rank.
-      ppiclf_bin_pos(1,1) = ppiclf_binb(1) + idum    *ppiclf_bins_dx(1)
-      ppiclf_bin_pos(2,1) = ppiclf_binb(1) + (idum+1)*ppiclf_bins_dx(1)
-      ppiclf_bin_pos(1,2) = ppiclf_binb(3) + jdum    *ppiclf_bins_dx(2)
-      ppiclf_bin_pos(2,2) = ppiclf_binb(3) + (jdum+1)*ppiclf_bins_dx(2)
-      ppiclf_bin_pos(1,3) = ppiclf_binb(5) + kdum    *ppiclf_bins_dx(3)
-      ppiclf_bin_pos(2,3) = ppiclf_binb(5) + (kdum+1)*ppiclf_bins_dx(3)
-
-      RETURN
-      END
-!-----------------------------------------------------------------------
-! This is the GitHub version. Currently testing Avery's new version
-! before merging it with the main branch.
-! This subroutine needs to be deleted later.
-!      SUBROUTINE ppiclf_comm_CreateBin
-!!
-!      IMPLICIT NONE
-!!
-!      INCLUDE "PPICLF"
-!!
-!! Internal:
-!!
-!      INTEGER*4  el_face_num(18),el_edge_num(36),el_corner_num(24),
-!     >                            nfacegp, nedgegp, ncornergp
-!      INTEGER*4 ix, iy, iz, iperiodicx, iperiodicy, iperiodicz, 
-!     >          npt_total, j, i, idum, jdum, kdum, total_bin, 
-!     >          sum_value, count, targetTotBin, idealBin(3), iBin(3),
-!     >          iBinTot, temp,nBinMax,nBinMed,nBinMin, m, l, k,
-!     >          LBMax,LBMin
-!      REAL*8 xmin, ymin, zmin, xmax, ymax, zmax, rduml, rdumr, rthresh,
-!     >       rmiddle, rdiff, binb_length(3),temp1,temp2
-!      INTEGER*4 ppiclf_iglsum
-!      EXTERNAL ppiclf_iglsum
-!      REAL*8 ppiclf_glmin,ppiclf_glmax,ppiclf_glsum
-!      EXTERNAL ppiclf_glmin,ppiclf_glmax,ppiclf_glsum
-!!
-!
-!! face, edge, and corner number, x,y,z are all inline, so stride=3
-!      el_face_num = (/ -1,0,0, 1,0,0, 0,-1,0, 0,1,0, 0,0,-1, 0,0,1 /)
-!      el_edge_num = (/ -1,-1,0 , 1,-1,0, 1,1,0 , -1,1,0 ,
-!     >                  0,-1,-1, 1,0,-1, 0,1,-1, -1,0,-1,
-!     >                  0,-1,1 , 1,0,1 , 0,1,1 , -1,0,1  /)
-!      el_corner_num = (/
-!     >                 -1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1,
-!     >                 -1,-1,1,  1,-1,1,  1,1,1,  -1,1,1 /)
-!
-!      nfacegp   = 4  ! number of faces
-!      nedgegp   = 4  ! number of edges
-!      ncornergp = 0  ! number of corners
-!
-!      IF(ppiclf_ndim .GT. 2) THEN
-!         nfacegp   = 6  ! number of faces
-!         nedgegp   = 12 ! number of edges
-!         ncornergp = 8  ! number of corners
-!      END IF
-!
-!      ix = 1
-!      iy = 2
-!      iz = 1
-!      IF(ppiclf_ndim .EQ. 3)
-!     >iz = 3
-!
-!      iperiodicx = ppiclf_iperiodic(1)
-!      iperiodicy = ppiclf_iperiodic(2)
-!      iperiodicz = ppiclf_iperiodic(3)
-!        
-!      ! iglsum is integer addition across MPI ranks.
-!      npt_total = ppiclf_iglsum(ppiclf_npart,1)
-!      ! compute bin boundaries
-!      xmin = 1E10
-!      ymin = 1E10
-!      zmin = 1E10
-!      xmax = -1E10
-!      ymax = -1E10
-!      zmax = -1E10
-!      ! Looping through particles on this processor
-!      DO i=1,ppiclf_npart
-!         ! Finding min/max particle extremes.
-!         ! Need to consider filter/neighborwidths
-!         ! to ensure ppiclf_bins_dx > ppiclf_d2chk(1)
-!         rduml = ppiclf_y(ix,i) - ppiclf_d2chk(1)
-!         rdumr = ppiclf_y(ix,i) + ppiclf_d2chk(1)
-!         IF(rduml .LT. xmin) xmin = rduml
-!         IF(rdumr .GT. xmax) xmax = rdumr
-!
-!         rduml = ppiclf_y(iy,i) - ppiclf_d2chk(1)
-!         rdumr = ppiclf_y(iy,i) + ppiclf_d2chk(1)
-!         IF(rduml .LT. ymin) ymin = rduml
-!         IF(rdumr .GT. ymax) ymax = rdumr
-!
-!         IF(ppiclf_ndim .EQ. 3) THEN
-!            rduml = ppiclf_y(iz,i) - ppiclf_d2chk(1)
-!            rdumr = ppiclf_y(iz,i) + ppiclf_d2chk(1)
-!            IF(rduml .LT. zmin) zmin = rduml
-!            IF(rdumr .GT. zmax) zmax = rdumr
-!         END IF
-!      END DO
-!      ! Finds global max/mins across MPI ranks
-!      ppiclf_binb(1) = ppiclf_glmin(xmin,1)
-!      ppiclf_binb(2) = ppiclf_glmax(xmax,1)
-!      ppiclf_binb(3) = ppiclf_glmin(ymin,1)
-!      ppiclf_binb(4) = ppiclf_glmax(ymax,1)
-!      ppiclf_binb(5) = 0.0d0
-!      ppiclf_binb(6) = 0.0d0
-!      IF(ppiclf_ndim .GT. 2) ppiclf_binb(5) = ppiclf_glmin(zmin,1)
-!      IF(ppiclf_ndim .GT. 2) ppiclf_binb(6) = ppiclf_glmax(zmax,1)
-!
-!!      if (npt_total .gt. 0) then
-!!      do i=1,ppiclf_ndim
-!!         if (ppiclf_bins_balance(i) .eq. 1) then
-!!            rmiddle = 0.0
-!!            do j=1,ppiclf_npart
-!!               rmiddle = rmiddle + ppiclf_y(i,j)
-!!            enddo
-!!            rmiddle = ppiclf_glsum(rmiddle,1)
-!!            rmiddle = rmiddle/npt_total
-!!
-!!            rdiff =  max(abs(rmiddle-ppiclf_binb(2*(i-1)+1)),
-!!     >                   abs(ppiclf_binb(2*(i-1)+2)-rmiddle))
-!!            ppiclf_binb(2*(i-1)+1) = rmiddle - rdiff
-!!            ppiclf_binb(2*(i-1)+2) = rmiddle + rdiff
-!!         endif
-!!      enddo
-!!      endif
-!
-!       if (ppiclf_xdrange(2,1) .lt. ppiclf_binb(2) .or.
-!     >    ppiclf_xdrange(1,1) .gt. ppiclf_binb(1) .or. 
-!     >    iperiodicx .eq. 0) then
-!         ppiclf_binb(1) = ppiclf_xdrange(1,1)
-!         ppiclf_binb(2) = ppiclf_xdrange(2,1)
-!       endif
-!
-!       if (ppiclf_xdrange(2,2) .lt. ppiclf_binb(4) .or.
-!     >    ppiclf_xdrange(1,2) .gt. ppiclf_binb(3) .or.
-!     >    iperiodicy .eq. 0) then
-!         ppiclf_binb(3) = ppiclf_xdrange(1,2)
-!         ppiclf_binb(4) = ppiclf_xdrange(2,2)
-!       endif
-!      
-!       if (ppiclf_ndim .gt. 2) then
-!       if (ppiclf_xdrange(2,3) .lt. ppiclf_binb(6) .or.
-!     >    ppiclf_xdrange(1,3) .gt. ppiclf_binb(5) .or. 
-!     >    iperiodicz .eq. 0) then
-!         ppiclf_binb(5) = ppiclf_xdrange(1,3)
-!         ppiclf_binb(6) = ppiclf_xdrange(2,3)
-!      endif ! ndim
-!      endif ! xdrange
-!
-!      ! End subroutine if no particles present      
-!      IF(npt_total .LT. 1) RETURN
-!      LBMax = 0
-!      LBMin = 0
-!      temp1 = 1.0D-10
-!      temp2 = 1.0D10
-!      ! Find ppiclf bin domain lengths
-!      ! and Max,Med,Min dimensions
-!       DO l = 1,3
-!        binb_length(l) = ppiclf_binb(2*l) -
-!     >                         ppiclf_binb(2*l-1)
-!        IF(binb_length(l).GT.temp1) THEN
-!          temp1 = binb_length(l)
-!          LBMax = l
-!        END IF
-!        IF(binb_length(l).LT.temp2) THEN
-!          temp2 = binb_length(l)
-!          LBMin = l
-!        END IF
-!       END DO
-!
-!       IF(ppiclf_ndim .LT. 3)
-!     >   CALL ppiclf_exittr('CreateBins only supports 3D Grids',0.0D0,0)
-!      
-!      ! Update with targetTotBin = ActiveBinNum
-!      targetTotBin = ppiclf_np
-!
-!      ! Number of bins calculated based on bin surface
-!      ! area minimization and bin aspect ratio close to 1
-!       ppiclf_n_bins(1) = INT((targetTotBin**(1.0D0/3.0D0))*
-!     >                   (binb_length(1)**(2.0D0/3.0D0))/ 
-!     >                   ((binb_length(2)**(1.0D0/3.0D0))*
-!     >                   (binb_length(3))**(1.0D0/3.0D0)))
-!     
-!      ppiclf_n_bins(2) = INT((targetTotBin**(1.0D0/3.0D0))*
-!     >                   (binb_length(2)**(2.0D0/3.0D0))/ 
-!     >                   ((binb_length(1)**(1.0D0/3.0D0))*
-!     >                   (binb_length(3))**(1.0D0/3.0D0)))
-!     
-!      ppiclf_n_bins(3) = INT((targetTotBin**(1.0D0/3.0D0))*
-!     >                   (binb_length(3)**(2.0D0/3.0D0))/ 
-!     >                   ((binb_length(2)**(1.0D0/3.0D0))*
-!     >                   (binb_length(1))**(1.0D0/3.0D0)))
-!      ! Since INT trucates, make sure n_bins at least 1 
-!      DO l = 1,3
-!        IF(ppiclf_n_bins(l) .LT. 1) ppiclf_n_bins(l) = 1
-!      END DO
-!
-!      iBinTot = 0
-!
-!      ! Filterwidth criteria check.  ppiclf_d2chk(2) automatically
-!      ! set to be at least 2 fluid cell widths in
-!      ! PICL_TEMP_InitSolver.F90
-!
-!       DO l = 1,3
-!          ! Ensure ppiclf_bin_dx(l) > ppiclf_d2chk(1) 
-!          if((binb_length(l)/ppiclf_n_bins(l)) .LT. ppiclf_d2chk(1)) 
-!     >      ppiclf_n_bins(l) = INT(binb_length(l)/ppiclf_d2chk(1))
-!          if(ppiclf_n_bins(l) .LT. 1) then
-!            print*, "*** ERROR in ppiclf_CreateBin"
-!            print*, "ppiclf_n_bins(l) =", ppiclf_n_bins(l), "l =", l
-!            print*, "ppiclf_d2chk(1) =", ppiclf_d2chk(1)
-!            CALL ppiclf_exittr('ppiclf_d2chk(1) criteria violated.',
-!     >      0.0d0,0)
-!          endif
-!        idealBin(l) = ppiclf_n_bins(l)
-!       END DO
-!
-!      ! Since bin must be an integer, check -1, +0, +1 number of bins for each bin dimension
-!      ! ideal number of bins will be max value while less than number of total target of bins.
-!      ! Will not check total bin value (cycle do loop) if
-!      ! ppiclf_d2chk(1) criteria is violated or ppiclf_n_bins < 1
-!
-!      total_bin = 0 
-!      DO ix = 1,3
-!        iBin(1) = ppiclf_n_bins(1) + (ix-2)
-!        ppiclf_bins_dx(1) = binb_length(1)/iBin(1)
-!        IF(ppiclf_bins_dx(1) .LT. ppiclf_d2chk(1) .OR.
-!     >                           iBin(1) .LT. 1) CYCLE
-!        DO iy = 1,3
-!          iBin(2) = ppiclf_n_bins(2) + (iy-2)
-!          ppiclf_bins_dx(2) = binb_length(2)/iBin(2)
-!          IF(ppiclf_bins_dx(2) .LT. ppiclf_d2chk(1) .OR.
-!     >                             iBin(2) .LT. 1) CYCLE
-!          DO iz = 1,3
-!            iBin(3) = ppiclf_n_bins(3) + (iz-2)
-!            ppiclf_bins_dx(3) = binb_length(3)/iBin(3)
-!            IF(ppiclf_bins_dx(3) .LT. ppiclf_d2chk(1) .OR.
-!     >                               iBin(3) .LT. 1) CYCLE
-!            iBinTot = iBin(1)*iBin(2)*iBin(3)
-!            IF(iBinTot .GT. total_bin .AND.
-!     >                     iBinTot .LE. targetTotBin) THEN
-!              total_bin = 1
-!              DO l = 1,3
-!                idealBin(l) = iBin(l)
-!                total_bin = total_bin*idealBin(l)
-!              END DO
-!              ! These loops are to make sure the dimension with the longest
-!              ! ppiclf_binb length gets more bins in the case where two or
-!              ! more dimensions are within 1 bin division of each other.
-!              temp = 0
-!              nBinMax = MAX(idealBin(1),idealBin(2),idealBin(3))
-!              nBinMin = MIN(idealBin(1),idealBin(2),idealBin(3))
-!              nBinMed = -99
-!              DO l = 1,3
-!                IF(idealBin(l).LT.nBinMax .AND. idealBin(l).GT.nBinMin)
-!     >             nBinMed = idealBin(l)
-!              END DO
-!              IF(nBinMed.EQ. -99) THEN !two number of bins are equal
-!                DO l = 1,3
-!                  IF(idealBin(l).EQ.nBinMax) temp = temp + 1
-!                  IF(idealBin(l).EQ.nBinMin) temp = temp + 10
-!                END DO
-!                IF(temp .EQ. 2) THEN
-!                  nBinMed = nBinMax
-!                ELSE ! Either two nBinMin or all 3 equal
-!                  nBinMed = nBinMin
-!                END IF
-!              END IF
-!              DO l = 1,3
-!                IF(l.EQ.LBMax) THEN
-!                  idealBin(l)=nBinMax
-!                ELSE IF(l.EQ.LBMin) THEN
-!                  idealBin(l)=nBinMin
-!                ELSE
-!                  idealBin(l)=nBinMed 
-!                END IF
-!              END DO 
-!            END IF
-!          END DO !iz
-!        END DO !iy
-!      END DO !ix
-!
-!      ! Set common ppiclf arrays based on above calculation
-!      DO l = 1,3
-!        ppiclf_n_bins(l) = idealBin(l)
-!        ppiclf_bins_dx(l) = binb_length(l)/ppiclf_n_bins(l)
-!      END DO
-!
-!
-!      ! Loop to see if we can add one to dimension with largest number of bins
-!      ! Choose this dimension because it is smallest incremental increase to total bins 
-!      DO
-!        IF((total_bin/ppiclf_n_bins(LBMax))*
-!     >      (ppiclf_n_bins(LBMax)+1) .LT. targetTotBin) THEN
-!          ! Add a bin and set new bin dx length
-!          ppiclf_n_bins(LBMax) = ppiclf_n_bins(LBMax)+1
-!          ppiclf_bins_dx(LBMax) = binb_length(LBMax)/
-!     >                              ppiclf_n_bins(LBMax)
-!          IF(ppiclf_bins_dx(LBMax) .LT. ppiclf_d2chk(1)) THEN
-!            ! If ppiclf_d2chk criteria violated, return to previous bin configuration
-!            ppiclf_n_bins(LBMax) = ppiclf_n_bins(LBMax)-1
-!            ppiclf_bins_dx(LBMax) = binb_length(LBMax)/
-!     >                                ppiclf_n_bins(LBMax)
-!            EXIT
-!          END IF
-!          total_bin = 1
-!          DO l = 1,3
-!            total_bin = total_bin*ppiclf_n_bins(l)
-!          END DO
-!        ELSE
-!          EXIT
-!        END IF
-!      END DO
-!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! David's old binning method left below for now
 !!      finished(1) = 0
