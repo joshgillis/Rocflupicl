@@ -307,6 +307,7 @@ c-----------------------------------------------------------------------
       ilen = ppiclf_indx1(stringo,'$')
       write(s25,25) rdata,idata
    25 format(1x,1p1e14.6,i10)
+      print*, "stringo", ppiclf_nid, ilen, stringo
       call ppiclf_chcopy(stringo(ilen),s25,25)
 
       if (ppiclf_nid.eq.0) write(6,1) (stringo(k),k=1,ilen+24)

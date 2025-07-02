@@ -628,13 +628,23 @@ DO i = 1,nCells
     EleLen(l) = ABS(MaxPoint(l)-MinPoint(l))
     ! Find max lengths for all mesh elements in all directions
     IF (EleLen(l) > 1D-2 .OR. EleLen(l) < 1D-7) THEN
-      WRITE(*,*) 'AVERY - Extreme points:', MaxPoint(l), MinPoint(l), 'Dimension:',l
+      !WRITE(*,*) 'AVERY - Extreme points:', MaxPoint(l), MinPoint(l), 'Dimension:',l
       CYCLE
     END IF
     IF (EleLen(l) .GT. Max_EleLen(l)) Max_EleLen(l) = EleLen(l)
   ENDDO !l
 ENDDO !i
+
+! Old filter
+filter = global%piclFilterWidth
+filter=filter/2.0d0
+if(global%myProcId .eq. MASTERPROC) print*, "Old filter =", filter
+
+! Avery's modified filter
 filter = 4*MAXVAL(Max_EleLen) ! Minimum two cells per ppiclf_bin
+filter=filter/2.0d0
+if(global%myProcId .eq. MASTERPROC) print*, "Avery filter =", filter
+
 ! TLJ compute ppcilf_d2chk here in rocpicl
 !     this is needed to have the bin at t=0 be
 !     the correct size
@@ -648,8 +658,9 @@ if ((neighborWidth .gt. global%piclNeighborWidth) &
         '*** WARNING *** PICL NEIGHBORWIDTH too small, defaulting to 4*dp_max'
 end if
 neighborWidth = MAX(neighborWidth, global%piclNeighborWidth)
-!filter = global%piclFilterWidth
-filter=filter/2.0d0
+
+! Thierry - checking is this is the issue for the quarter cylinder shock tube not working
+
 
 if (global%myProcid == MASTERPROC)  then
    print*,' '

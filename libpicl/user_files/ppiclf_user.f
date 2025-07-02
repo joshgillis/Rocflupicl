@@ -470,6 +470,7 @@
 !
          if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
          if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
+         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz

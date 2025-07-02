@@ -661,13 +661,23 @@ DO i = 1,nCells
     EleLen(l) = ABS(MaxPoint(l)-MinPoint(l))
     ! Find max lengths for all mesh elements in all directions
     IF (EleLen(l) > 1D-2 .OR. EleLen(l) < 1D-7) THEN
-      WRITE(*,*) 'AVERY - Extreme points:', MaxPoint(l), MinPoint(l), 'Dimension:',l
+      !WRITE(*,*) 'AVERY - Extreme points:', MaxPoint(l), MinPoint(l), 'Dimension:',l
       CYCLE
     END IF
     IF (EleLen(l) .GT. Max_EleLen(l)) Max_EleLen(l) = EleLen(l)
   ENDDO !l
 ENDDO !i
+
+! Old filter
+filter = global%piclFilterWidth
+filter=filter/2.0d0
+if(global%myProcId .eq. MASTERPROC) print*, "Old filter =", filter
+
+! Avery's modified filter
 filter = 4*MAXVAL(Max_EleLen) ! Minimum two cells per ppiclf_bin
+filter=filter/2.0d0
+if(global%myProcId .eq. MASTERPROC) print*, "Avery filter =", filter
+
 ! TLJ compute ppcilf_d2chk here in rocpicl
 !     this is needed to have the bin at t=0 be
 !     the correct size
@@ -681,8 +691,9 @@ if ((neighborWidth .gt. global%piclNeighborWidth) &
         '*** WARNING *** PICL NEIGHBORWIDTH too small, defaulting to 4*dp_max'
 end if
 neighborWidth = MAX(neighborWidth, global%piclNeighborWidth)
-!filter = global%piclFilterWidth
-filter=filter/2.0d0
+
+! Thierry - checking is this is the issue for the quarter cylinder shock tube not working
+
 
 if (global%myProcid == MASTERPROC)  then
    print*,' '
@@ -720,7 +731,7 @@ call ppiclf_comm_InitOverlapMesh(nCells,lx,ly,lz,xGrid,yGrid,zGrid)
 !           angular periodicity around z-axis
 IF(((ang_per_flag.eq.1) .and. (x_per_flag.eq.1 .or. y_per_flag.eq.1)) .or. & 
     (ang_per_flag .gt. 1)) THEN
-    CALL ErrorStop(global,ERR_PICL_INVALID_PERIODICITY,690,&
+    CALL ErrorStop(global,ERR_PICL_INVALID_PERIODICITY,701,&
       'Wrong periodicity choices for ppiclF')
 END IF 
 
@@ -780,31 +791,31 @@ end if
 DEALLOCATE(xGrid,STAT=errorFlag)
 global%error = errorFlag
 IF ( global%error /= ERR_NONE ) THEN
-  CALL ErrorStop(global,ERR_DEALLOCATE,750,'PPICLF:xGrid')
+  CALL ErrorStop(global,ERR_DEALLOCATE,761,'PPICLF:xGrid')
 END IF ! global%error
 
 DEALLOCATE(yGrid,STAT=errorFlag)
 global%error = errorFlag
 IF ( global%error /= ERR_NONE ) THEN
-  CALL ErrorStop(global,ERR_DEALLOCATE,756,'PPICLF:yGrid')
+  CALL ErrorStop(global,ERR_DEALLOCATE,767,'PPICLF:yGrid')
 END IF ! global%error
 
 DEALLOCATE(zGrid,STAT=errorFlag)
 global%error = errorFlag
 IF ( global%error /= ERR_NONE ) THEN
-  CALL ErrorStop(global,ERR_DEALLOCATE,762,'PPICLF:zGrid')
+  CALL ErrorStop(global,ERR_DEALLOCATE,773,'PPICLF:zGrid')
 END IF ! global%error
 
 ALLOCATE(vfP(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,768,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,779,'PPICLF:xGrid')
     END IF ! global%error
 
 ALLOCATE(volp(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,774,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,785,'PPICLF:xGrid')
     END IF ! global%error
 
 do i=1,pGrid%nCellsTot
@@ -823,7 +834,7 @@ DO i = 1,pRegion%grid%nCells
 
        IF (pRegion%mixtInput%axiFlag) THEN
            WRITE(*,*) "Need to properly implement axi-sym for phip init."
-           CALL ErrorStop(global,ERR_OPTION_TYPE,793,'PPICLF:axi')
+           CALL ErrorStop(global,ERR_OPTION_TYPE,804,'PPICLF:axi')
        END IF
 
        tester = tester + (0.125*vfP(lx,ly,lz,i))*pRegion%grid%vol(i)
@@ -855,7 +866,7 @@ DO icg = 1,pGrid%nCellsTot
     pRegion%mixt%cv(CV_MIXT_ENER,icg) = vFrac*pRegion%mixt%cv(CV_MIXT_ENER,icg)
     if (pRegion%mixt%cv(CV_MIXT_DENS,icg) .le. 0.0) then
          WRITE(*,*) "Error: negative density: ",pRegion%mixt%cv(CV_MIXT_DENS,icg)      
-         CALL ErrorStop(global,ERR_INVALID_VALUE,825,'PPICLF:init')
+         CALL ErrorStop(global,ERR_INVALID_VALUE,836,'PPICLF:init')
     end if    
 
 END DO ! icg
@@ -863,12 +874,12 @@ END DO ! icg
 DEALLOCATE(vfP,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,833,'PPICLF:zGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,844,'PPICLF:zGrid')
     END IF ! global%error
 DEALLOCATE(volp,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,838,'PPICLF:zGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,849,'PPICLF:zGrid')
     END IF ! global%error
 
 !!Josh - Removed Brad Comments and Restart Section
