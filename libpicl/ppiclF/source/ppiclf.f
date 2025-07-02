@@ -5662,149 +5662,149 @@
         END IF
       END DO
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! David's old binning method left below for now
+!      finished(1) = 0
+!      finished(2) = 0
+!      finished(3) = 0
+!      total_bin = 1 
+!
+!      do i=1,ppiclf_ndim
+!         finished(i) = 0
+!         exit_1_array(i) = ppiclf_bins_set(i)
+!         exit_2_array(i) = 0
+!         if (ppiclf_bins_set(i) .ne. 1) ppiclf_n_bins(i) = 1
+!         ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                        ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                       ppiclf_n_bins(i)
+!         ! Make sure exit_2 is not violated by user input
+!         if (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1)) then
+!            do while (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1))
+!               ppiclf_n_bins(i) = max(1, ppiclf_n_bins(i)-1)
+!               ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                              ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                             ppiclf_n_bins(i)
+!         WRITE(*,*) "Inf. loop in CreateBin", i, 
+!     >              ppiclf_bins_dx(i), ppiclf_d2chk(1)
+!         call ppiclf_exittr('Inf. loop in CreateBin$',0.0,0)
+!            enddo
+!         endif
+!         total_bin = total_bin*ppiclf_n_bins(i)
+!      enddo
+!
+!      ! Make sure exit_1 is not violated by user input
+!      count = 0
+!      do while (total_bin > ppiclf_np)
+!          count = count + 1;
+!          i = modulo((ppiclf_ndim-1)+count,ppiclf_ndim)+1
+!          ppiclf_n_bins(i) = max(ppiclf_n_bins(i)-1,1)
+!          ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                         ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                        ppiclf_n_bins(i)
+!          total_bin = 1
+!          do j=1,ppiclf_ndim
+!             total_bin = total_bin*ppiclf_n_bins(j)
+!          enddo
+!          if (total_bin .le. ppiclf_np) exit
+!       enddo
+!
+!       exit_1 = .false.
+!       exit_2 = .false.
+!
+!       do while (.not. exit_1 .and. .not. exit_2)
+!          do i=1,ppiclf_ndim
+!             if (exit_1_array(i) .eq. 0) then
+!                ppiclf_n_bins(i) = ppiclf_n_bins(i) + 1
+!                ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                               ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                              ppiclf_n_bins(i)
+!
+!                ! Check conditions
+!                ! exit_1
+!                total_bin = 1
+!                do j=1,ppiclf_ndim
+!                   total_bin = total_bin*ppiclf_n_bins(j)
+!                enddo
+!                if (total_bin .gt. ppiclf_np) then
+!                   ! two exit arrays aren't necessary for now, but
+!                   ! to make sure exit_2 doesn't slip through, we
+!                   ! set both for now
+!                   exit_1_array(i) = 1
+!                   exit_2_array(i) = 1
+!                   ppiclf_n_bins(i) = ppiclf_n_bins(i) - 1
+!                   ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                                  ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                                  ppiclf_n_bins(i)
+!                   exit
+!                endif
+!                
+!                ! exit_2
+!                if (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1)) then
+!                   ! two exit arrays aren't necessary for now, but
+!                   ! to make sure exit_2 doesn't slip through, we
+!                   ! set both for now
+!                   exit_1_array(i) = 1
+!                   exit_2_array(i) = 1
+!                   ppiclf_n_bins(i) = ppiclf_n_bins(i) - 1
+!                   ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
+!     >                                  ppiclf_binb(2*(i-1)+1)  ) / 
+!     >                                  ppiclf_n_bins(i)
+!                   exit
+!                endif
+!             endif
+!          enddo
+!
+!          ! full exit_1
+!          sum_value = 0
+!          do i=1,ppiclf_ndim
+!             sum_value = sum_value + exit_1_array(i)
+!          enddo
+!          if (sum_value .eq. ppiclf_ndim) then
+!             exit_1 = .true.
+!          endif
+!
+!          ! full exit_2
+!          sum_value = 0
+!          do i=1,ppiclf_ndim
+!             sum_value = sum_value + exit_2_array(i)
+!          enddo
+!          if (sum_value .eq. ppiclf_ndim) then
+!             exit_2 = .true.
+!          endif
+!       enddo
+!      ! Check for too small bins 
+!      rthresh = 1E-12
+!      total_bin = 1
+!      do i=1,ppiclf_ndim
+!         total_bin = total_bin*ppiclf_n_bins(i)
+!         if (ppiclf_bins_dx(i) .lt. rthresh) ppiclf_bins_dx(i) = 1.0
+!      enddo
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! David's old binning method left below for now
-!!      finished(1) = 0
-!!      finished(2) = 0
-!!      finished(3) = 0
-!!      total_bin = 1 
-!!
-!!      do i=1,ppiclf_ndim
-!!         finished(i) = 0
-!!         exit_1_array(i) = ppiclf_bins_set(i)
-!!         exit_2_array(i) = 0
-!!         if (ppiclf_bins_set(i) .ne. 1) ppiclf_n_bins(i) = 1
-!!         ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                        ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                       ppiclf_n_bins(i)
-!!         ! Make sure exit_2 is not violated by user input
-!!         if (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1)) then
-!!            do while (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1))
-!!               ppiclf_n_bins(i) = max(1, ppiclf_n_bins(i)-1)
-!!               ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                              ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                             ppiclf_n_bins(i)
-!!         WRITE(*,*) "Inf. loop in CreateBin", i, 
-!!     >              ppiclf_bins_dx(i), ppiclf_d2chk(1)
-!!         call ppiclf_exittr('Inf. loop in CreateBin$',0.0,0)
-!!            enddo
-!!         endif
-!!         total_bin = total_bin*ppiclf_n_bins(i)
-!!      enddo
-!!
-!!      ! Make sure exit_1 is not violated by user input
-!!      count = 0
-!!      do while (total_bin > ppiclf_np)
-!!          count = count + 1;
-!!          i = modulo((ppiclf_ndim-1)+count,ppiclf_ndim)+1
-!!          ppiclf_n_bins(i) = max(ppiclf_n_bins(i)-1,1)
-!!          ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                         ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                        ppiclf_n_bins(i)
-!!          total_bin = 1
-!!          do j=1,ppiclf_ndim
-!!             total_bin = total_bin*ppiclf_n_bins(j)
-!!          enddo
-!!          if (total_bin .le. ppiclf_np) exit
-!!       enddo
-!!
-!!       exit_1 = .false.
-!!       exit_2 = .false.
-!!
-!!       do while (.not. exit_1 .and. .not. exit_2)
-!!          do i=1,ppiclf_ndim
-!!             if (exit_1_array(i) .eq. 0) then
-!!                ppiclf_n_bins(i) = ppiclf_n_bins(i) + 1
-!!                ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                               ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                              ppiclf_n_bins(i)
-!!
-!!                ! Check conditions
-!!                ! exit_1
-!!                total_bin = 1
-!!                do j=1,ppiclf_ndim
-!!                   total_bin = total_bin*ppiclf_n_bins(j)
-!!                enddo
-!!                if (total_bin .gt. ppiclf_np) then
-!!                   ! two exit arrays aren't necessary for now, but
-!!                   ! to make sure exit_2 doesn't slip through, we
-!!                   ! set both for now
-!!                   exit_1_array(i) = 1
-!!                   exit_2_array(i) = 1
-!!                   ppiclf_n_bins(i) = ppiclf_n_bins(i) - 1
-!!                   ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                                  ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                                  ppiclf_n_bins(i)
-!!                   exit
-!!                endif
-!!                
-!!                ! exit_2
-!!                if (ppiclf_bins_dx(i) .lt. ppiclf_d2chk(1)) then
-!!                   ! two exit arrays aren't necessary for now, but
-!!                   ! to make sure exit_2 doesn't slip through, we
-!!                   ! set both for now
-!!                   exit_1_array(i) = 1
-!!                   exit_2_array(i) = 1
-!!                   ppiclf_n_bins(i) = ppiclf_n_bins(i) - 1
-!!                   ppiclf_bins_dx(i) = (ppiclf_binb(2*(i-1)+2) -
-!!     >                                  ppiclf_binb(2*(i-1)+1)  ) / 
-!!     >                                  ppiclf_n_bins(i)
-!!                   exit
-!!                endif
-!!             endif
-!!          enddo
-!!
-!!          ! full exit_1
-!!          sum_value = 0
-!!          do i=1,ppiclf_ndim
-!!             sum_value = sum_value + exit_1_array(i)
-!!          enddo
-!!          if (sum_value .eq. ppiclf_ndim) then
-!!             exit_1 = .true.
-!!          endif
-!!
-!!          ! full exit_2
-!!          sum_value = 0
-!!          do i=1,ppiclf_ndim
-!!             sum_value = sum_value + exit_2_array(i)
-!!          enddo
-!!          if (sum_value .eq. ppiclf_ndim) then
-!!             exit_2 = .true.
-!!          endif
-!!       enddo
-!!      ! Check for too small bins 
-!!      rthresh = 1E-12
-!!      total_bin = 1
-!!      do i=1,ppiclf_ndim
-!!         total_bin = total_bin*ppiclf_n_bins(i)
-!!         if (ppiclf_bins_dx(i) .lt. rthresh) ppiclf_bins_dx(i) = 1.0
-!!      enddo
-!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!! -------------------------------------------------------
-!! SETUP 3D BACKGROUND GRID PARAMETERS FOR GHOST PARTICLES
-!! -------------------------------------------------------
-!
-!!     current box coordinates
-!      IF(ppiclf_nid .LE. total_bin-1) THEN
-!         idum = modulo(ppiclf_nid,ppiclf_n_bins(1))
-!         jdum = modulo(ppiclf_nid/ppiclf_n_bins(1),ppiclf_n_bins(2))
-!         kdum = ppiclf_nid/(ppiclf_n_bins(1)*ppiclf_n_bins(2))
-!         IF(ppiclf_ndim .LT. 3) kdum = 0
-!         ppiclf_binx(1,1) = ppiclf_binb(1) + idum    *ppiclf_bins_dx(1)
-!         ppiclf_binx(2,1) = ppiclf_binb(1) + (idum+1)*ppiclf_bins_dx(1)
-!         ppiclf_biny(1,1) = ppiclf_binb(3) + jdum    *ppiclf_bins_dx(2)
-!         ppiclf_biny(2,1) = ppiclf_binb(3) + (jdum+1)*ppiclf_bins_dx(2)
-!         ppiclf_binz(1,1) = 0.0d0
-!         ppiclf_binz(2,1) = 0.0d0
-!         IF(ppiclf_ndim .GT. 2) THEN
-!            ppiclf_binz(1,1) = ppiclf_binb(5)+kdum    *ppiclf_bins_dx(3)
-!            ppiclf_binz(2,1) = ppiclf_binb(5)+(kdum+1)*ppiclf_bins_dx(3)
-!         END IF
-!      END IF
-!
-!      RETURN
-!      END
+! -------------------------------------------------------
+! SETUP 3D BACKGROUND GRID PARAMETERS FOR GHOST PARTICLES
+! -------------------------------------------------------
+
+!     current box coordinates
+      IF(ppiclf_nid .LE. total_bin-1) THEN
+         idum = modulo(ppiclf_nid,ppiclf_n_bins(1))
+         jdum = modulo(ppiclf_nid/ppiclf_n_bins(1),ppiclf_n_bins(2))
+         kdum = ppiclf_nid/(ppiclf_n_bins(1)*ppiclf_n_bins(2))
+         IF(ppiclf_ndim .LT. 3) kdum = 0
+         ppiclf_binx(1,1) = ppiclf_binb(1) + idum    *ppiclf_bins_dx(1)
+         ppiclf_binx(2,1) = ppiclf_binb(1) + (idum+1)*ppiclf_bins_dx(1)
+         ppiclf_biny(1,1) = ppiclf_binb(3) + jdum    *ppiclf_bins_dx(2)
+         ppiclf_biny(2,1) = ppiclf_binb(3) + (jdum+1)*ppiclf_bins_dx(2)
+         ppiclf_binz(1,1) = 0.0d0
+         ppiclf_binz(2,1) = 0.0d0
+         IF(ppiclf_ndim .GT. 2) THEN
+            ppiclf_binz(1,1) = ppiclf_binb(5)+kdum    *ppiclf_bins_dx(3)
+            ppiclf_binz(2,1) = ppiclf_binb(5)+(kdum+1)*ppiclf_bins_dx(3)
+         END IF
+      END IF
+
+      RETURN
+      END
 !-----------------------------------------------------------------------
       subroutine ppiclf_comm_CreateSubBin
 !

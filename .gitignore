@@ -2,6 +2,11 @@
 build_lib/*.f90
 build_lib/*.d
 build_lib/*.o
+build_util/*/*.o
+build_util/*/*.d
+build_util/*/*.mod
+build_std/*.o
+
 
 # Vim swap files
 ## RocfluMP
