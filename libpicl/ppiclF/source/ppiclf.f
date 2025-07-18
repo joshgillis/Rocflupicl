@@ -434,6 +434,8 @@
                vpmean   = ppiclf_y(PPICLF_JVY,i)
                wpmean   = ppiclf_y(PPICLF_JVZ,i)
                u2pmean  = upmean**2
+               v2pmean  = vpmean**2
+               w2pmean  = wpmean**2
                icpmean  = 1
             else if (qs_fluct_filter_flag==1) then
                ! gaussian kernel
@@ -1405,8 +1407,9 @@
        end if ! mp
       endif    ! re
 
-      ! Sangani's volume fraction correction
-      phi_corr = (1.+2.*phi)/((1.-phi)**3)
+      ! Sangani's volume fraction correction for dilute random arrays
+      ! Capping volume fraction at 0.5
+      phi_corr = (1.0+5.94*min(rphip,0.5))
       
       cd = (24.0/re)*rcd1*phi_corr
 
@@ -2192,8 +2195,9 @@
       endif
       rcd_am = rcd_am * 0.5
 
-      ! Volume fraction correction
-      rcd_am = rcd_am*(1.0+2.0*rphip)
+      ! Sangani's volume fraction correction for dilute random arrays
+      ! Capping volume fraction at 0.5 
+      rcd_am = rcd_am*(1.0+3.32*min(rphip,0.5))
 
       rmass_add = rhof*ppiclf_rprop(PPICLF_R_JVOLP,i)*rcd_am
 
@@ -3894,7 +3898,9 @@
       time = 0.0d0
 
       fH     = 0.75d0 + .105d0*reyL
-      factor = 3.0d0*rpi*rnu*dp*ppiclf_dt
+      ! Sangani's volume fraction correction for dilute random arrays
+      ! Capping volume fraction at 0.5 
+      factor = 3.0d0*rpi*rnu*dp*ppiclf_dt*(1.0+2.28*min(rphip,0.5))
 
       if (ppiclf_nTimeBH > 1) then
          do iT = 2,ppiclf_nTimeBH-1
