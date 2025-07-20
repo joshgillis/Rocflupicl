@@ -485,7 +485,7 @@
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
          elseif (qs_fluct_flag==2) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct)
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct)
          endif
 
          ! Add fluctuation part to quasi-steady force
