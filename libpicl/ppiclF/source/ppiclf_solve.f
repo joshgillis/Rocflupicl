@@ -432,6 +432,9 @@
       do j=1,PPICLF_LRP3
          ppiclf_rprop3(j,i) = 0.0d0
       ENDdo
+      do j=1,PPICLF_LRP4
+         ppiclf_rprop4(j,i) = 0.0d0
+      ENDdo
       do j=1,PPICLF_LIP
          ppiclf_iprop(j,i) = 0
       enddo
@@ -2939,6 +2942,8 @@ c----------------------------------------------------------------------
      >              (ppiclf_rprop2(1,ic),ppiclf_rprop2(1,i),PPICLF_LRP2)
                call ppiclf_copy
      >              (ppiclf_rprop3(1,ic),ppiclf_rprop3(1,i),PPICLF_LRP3)
+               call ppiclf_copy
+     >              (ppiclf_rprop4(1,ic),ppiclf_rprop4(1,i),PPICLF_LRP4)
                call ppiclf_icopy
      >              (ppiclf_iprop(1,ic) ,ppiclf_iprop(1,i) ,PPICLF_LIP)
             ENDif
@@ -3124,6 +3129,14 @@ c----------------------------------------------------------------------
             ic = ic + 1
             rproj(ic,ip) = ppiclf_cp_map(j,ip)*multfci
          ENDdo
+
+         write(90,*) ppiclf_time,
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+2,ip), ! JFX
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+3,ip), ! JFY
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+4,ip) ! JFZ
+
+         write(70,*) ppiclf_time, ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP
+     >    +11,ip), rproj(15,ip)
                     
          iproj(1,ip)  = ppiclf_iprop(8,ip)
          iproj(2,ip)  = ppiclf_iprop(9,ip)
@@ -3367,6 +3380,7 @@ c----------------------------------------------------------------------
             END if ! if3d
 
              rexp = 1.0 / evol
+             print*, "evol =", evol
            do k=1,PPICLF_LEZ
            do j=1,PPICLF_LEY
            do i=1,PPICLF_LEX

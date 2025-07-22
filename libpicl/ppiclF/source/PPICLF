@@ -2,7 +2,9 @@
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 c Computational particles
       REAL*8 PPICLF_Y (12 ,20000) ! Solution
      > ,PPICLF_YDOT (12 ,20000) ! Total solution RHS
@@ -10,12 +12,14 @@ c Computational particles
      > ,PPICLF_RPROP (64 ,20000) ! Real particle properties
      > ,PPICLF_RPROP2(4,20000) ! Secondary real particle properties
      > ,PPICLF_RPROP3(6*5,20000) ! Third real particle properties
+     > ,PPICLF_RPROP4(9,20000) ! Fourth real particle properties
       COMMON /PPICLF_SLN_CURRENT_R/ PPICLF_Y
      > ,PPICLF_YDOT
      > ,PPICLF_YDOTC
      > ,PPICLF_RPROP
      > ,PPICLF_RPROP2
      > ,PPICLF_RPROP3
+     > ,PPICLF_RPROP4
       INTEGER*4 PPICLF_IPROP(11,20000) ! Integer particle properties
       COMMON /PPICLF_SLN_CURRENT_I/ PPICLF_IPROP
       COMMON /PPICLF_SLN_CURRENT_N/ PPICLF_NPART
@@ -34,7 +38,9 @@ c Previous time step solutions, may grow later
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 C Grid
       REAL*8 PPICLF_XDRANGE(2,3), PPICLF_XERANGE(2,3,75000)
       COMMON /PPICLF_GRID_RANGE_R/ PPICLF_XDRANGE, PPICLF_XERANGE
@@ -43,7 +49,7 @@ C Grid
      > ,PPICLF_XM1B ,PPICLF_XM1BS, PPICLF_XM1BI
      > ,PPICLF_XM1BG, PPICLF_INT_FLDG
       REAL*8 PPICLF_PRO_FLD (2,2,2,75000
-     > ,10),
+     > ,19),
      > PPICLF_INT_FLDU(2,2,2
      > ,75000,30),
      > PPICLF_INT_FLD (2,2,2
@@ -51,7 +57,7 @@ C Grid
      > PPICLF_INT_FLDG(2,2,2
      > ,30,75000),
      > PPICLF_PRO_FLDB(2,2,2
-     > ,10,75000),
+     > ,19,75000),
      > PPICLF_XM1B (2,2,2,3
      > ,75000),
      > PPICLF_XM1BS (2,2,2
@@ -85,7 +91,9 @@ C Grid
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 c Particle options
       LOGICAL PPICLF_RESTART, PPICLF_OVERLAP, PPICLF_LCOMM
      > ,PPICLF_LINIT, PPICLF_LFILT, PPICLF_LINTP, PPICLF_LPROJ
@@ -118,7 +126,9 @@ c Particle options
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 c Communication
       COMMON /PPICLF_PARALLEL_COMM_I/ PPICLF_COMM, PPICLF_NP, PPICLF_NID
      > ,PPICLF_CR_HNDL, PPICLF_FP_HNDL
@@ -137,7 +147,7 @@ c Bins
       REAL*4 PPICLF_GRID_X(1,1,1)
      > ,PPICLF_GRID_Y(1,1,1)
      > ,PPICLF_GRID_Z(1,1,1)
-     > ,PPICLF_GRID_FLD(1,1,1,10)
+     > ,PPICLF_GRID_FLD(1,1,1,19)
       COMMON /PPICLF_PARALLEL_BIN_LOCAL_R/ PPICLF_BINX, PPICLF_BINY
      > ,PPICLF_BINZ, PPICLF_RDX
      > ,PPICLF_RDY, PPICLF_RDZ
@@ -149,8 +159,8 @@ c Bins
       COMMON /PPICLF_PARALLEL_BIN_LOCAL_N/ PPICLF_BX, PPICLF_BY
      > ,PPICLF_BZ
 C Ghost particles
-      REAL*8 PPICLF_RPROP_GP(12 +64 +10,26*20000)
-     > ,PPICLF_CP_MAP(12 +64 +10,20000)
+      REAL*8 PPICLF_RPROP_GP(12 +64 +19,26*20000)
+     > ,PPICLF_CP_MAP(12 +64 +19,20000)
       COMMON /PPICLF_PARALLEL_GHOST_R/ PPICLF_RPROP_GP, PPICLF_CP_MAP
       INTEGER*4 PPICLF_NB_R(3,20000)
      > ,PPICLF_NB_G(3,26*20000)
@@ -163,7 +173,9 @@ C Ghost particles
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 !
 ! General useage
 !
@@ -202,8 +214,8 @@ C Ghost particles
       common /user_fluct01/ icpmean
       common /user_fluct02/ upmean, vpmean, wpmean, phipmean
       common /user_fluct03/ u2pmean, v2pmean, w2pmean
-      real*8 UnifRnd(6)
-      common /user_fluct02/ UnifRnd
+      real*8 UnifRnd(6), Rsg(3,3)
+      common /user_fluct02/ UnifRnd, Rsg
 !
 ! For ppiclf_user_debug.f
 !
@@ -262,7 +274,9 @@ C Ghost particles
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
 ! rprop: 64
-! map: 10
+! rprop4: PPICLF_LRP4
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
 C Wall support
       REAL*8 PPICLF_WALL_C(9,20),PPICLF_WALL_N(4,20)
       COMMON /PPICLF_WALL_R/ PPICLF_WALL_C,PPICLF_WALL_N

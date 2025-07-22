@@ -6,7 +6,7 @@
 #define PPICLF_LEY 2
 #define PPICLF_LEZ 2
 #define PPICLF_LRP_INT 30
-#define PPICLF_LRP_PRO 10
+#define PPICLF_LRP_PRO 19
 
 ! number of timesteps kept in history kernels
 #define PPICLF_VU 5
@@ -93,6 +93,17 @@
 #define PPICLF_R_JSDOY 63
 #define PPICLF_R_JSDOZ 64
 
+! rprop4: PPICLF_LRP4
+#define PPICLF_R_JRSG11 1
+#define PPICLF_R_JRSG12 2
+#define PPICLF_R_JRSG13 3
+#define PPICLF_R_JRSG21 4
+#define PPICLF_R_JRSG22 5
+#define PPICLF_R_JRSG23 6
+#define PPICLF_R_JRSG31 7
+#define PPICLF_R_JRSG32 8
+#define PPICLF_R_JRSG33 9
+
 ! map: PPICLF_LRP_PRO
 #define PPICLF_P_JPHIP 1
 #define PPICLF_P_JFX 2
@@ -104,3 +115,13 @@
 #define PPICLF_P_JPHIPV 8
 #define PPICLF_P_JPHIPW 9
 #define PPICLF_P_JPHIPT 10
+!--- Reynolds Subgrid Stress Tensor
+#define PPICLF_P_JRSG11 11
+#define PPICLF_P_JRSG12 12
+#define PPICLF_P_JRSG13 13
+#define PPICLF_P_JRSG21 14
+#define PPICLF_P_JRSG22 15
+#define PPICLF_P_JRSG23 16
+#define PPICLF_P_JRSG31 17
+#define PPICLF_P_JRSG32 18
+#define PPICLF_P_JRSG33 19

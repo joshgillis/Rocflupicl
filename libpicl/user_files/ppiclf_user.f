@@ -50,7 +50,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -58,7 +58,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -304,7 +304,6 @@
 !
 !-----------------------------------------------------------------------
 !
-!
 ! Evaluate ydot, the rhs of the equations of motion
 ! for the particles
 !
@@ -386,7 +385,6 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -484,7 +482,7 @@
          !   and is called above in Step 1b
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
-         elseif (qs_fluct_flag==2) then
+         elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
             call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct)
          endif
 
@@ -699,6 +697,26 @@
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
      >           qq )
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
+
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! We need to store the tensor calculations here in a certain array and then
+      ! access that in the mapping subroutine for when projection is needed
+      ! I tried accessing the array from the mapping subroutine directly but there 
+      ! was a mismatch in values with the exact simulation time
+
+            ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
+            ppiclf_rprop4(PPICLF_R_JRSG12,i) = 0.0d0 !Rsg(1,2)
+            ppiclf_rprop4(PPICLF_R_JRSG13,i) = 0.0d0 !Rsg(1,3)
+            ppiclf_rprop4(PPICLF_R_JRSG21,i) = 0.0d0 !Rsg(2,1)
+            ppiclf_rprop4(PPICLF_R_JRSG22,i) = 0.0d0 !Rsg(2,2)
+            ppiclf_rprop4(PPICLF_R_JRSG23,i) = 0.0d0 !Rsg(2,3)
+            ppiclf_rprop4(PPICLF_R_JRSG31,i) = 0.0d0 !Rsg(3,1)
+            ppiclf_rprop4(PPICLF_R_JRSG32,i) = 0.0d0 !Rsg(3,2)
+            ppiclf_rprop4(PPICLF_R_JRSG33,i) = 0.0d0 !Rsg(3,3) 
+            
+            if(iStage .eq. 3) then
+              write(71,*) ppiclf_time, i, ppiclf_rprop4(1,i)
+            endif
          endif 
 
 !

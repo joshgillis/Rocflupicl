@@ -175,6 +175,8 @@ TYPE(t_grid), POINTER :: pGrid
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOX
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOY
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOZ
+  REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: RSG11
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: RSG11Cell
 
   ! TLJ - added for Feedback term - 04/01/2025
   INTEGER, DIMENSION(:), ALLOCATABLE :: varInfoPicl
@@ -472,6 +474,18 @@ TYPE(t_grid), POINTER :: pGrid
       CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
     END IF ! global%error
 
+    ALLOCATE(RSG11(2,2,2,nCells),STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
+    ALLOCATE(RSG11Cell(nCells),STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
 
 
 !Might need to update prim like plag does
@@ -485,15 +499,20 @@ pGc => pRegion%mixt%gradCell
        JFXCell(i) = 0.0_RFREAL
        JFYCell(i) = 0.0_RFREAL
        JFZCell(i) = 0.0_RFREAL
+       RSG11Cell(i) = 0.0_RFREAL
        do lz=1,2
        do ly=1,2
        do lx=1,2 
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JFX,JFX(lx,ly,lz,i))  
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JFY,JFY(lx,ly,lz,i))
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JFZ,JFZ(lx,ly,lz,i))
+          ! 07/21/2025 - Thierry - begins here - added for PseudoTurbulence - not sure if I need it here ?
+          call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG11,RSG11(lx,ly,lz,i))
+          ! 07/21/2025 - Thierry - ends here
           JFXCell(i) = JFXCell(i) + JFX(lx,ly,lz,i)
           JFYCell(i) = JFYCell(i) + JFY(lx,ly,lz,i) 
           JFZCell(i) = JFZCell(i) + JFZ(lx,ly,lz,i) 
+          RSG11Cell(i) = RSG11Cell(i) + RSG11(lx,ly,lz,i)
        end do
        end do
        end do 
@@ -502,6 +521,7 @@ pGc => pRegion%mixt%gradCell
        JFXCell(i) = JFXCell(i) * 0.125 * pregion%grid%vol(i)
        JFYCell(i) = JFYCell(i) * 0.125 * pregion%grid%vol(i)
        JFZCell(i) = JFZCell(i) * 0.125 * pregion%grid%vol(i)
+       RSG11Cell(i) = RSG11Cell(i) * 0.125 * pregion%grid%vol(i)
        pregion%mixt%piclFeedback(1,i) = JFXCell(i)
        pregion%mixt%piclFeedback(2,i) = JFYCell(i)
        pregion%mixt%piclFeedback(3,i) = JFZCell(i)
@@ -752,7 +772,11 @@ pGc => pRegion%mixt%gradCell
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JSDOY,SDOY)  
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JSDOZ,SDOZ)  
 
-
+!---------------------------------------------------------------------------------------
+! 07/22/2025 - Thierry Daoud - Integration Should Happen Before Projecting Back to the Fluid
+!SOLVE
+     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!---------------------------------------------------------------------------------------
 !FEED BACK TERM
 !Fill arrays for interp field
 IF (global%piclFeedbackFlag == 1) THEN
@@ -770,6 +794,7 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFYCell(i) = 0.0_RFREAL
        JFZCell(i) = 0.0_RFREAL
        JFECell(i) = 0.0_RFREAL
+       RSG11Cell(i) = 0.0_RFREAL
        do lz=1,2
        do ly=1,2
        do lx=1,2 
@@ -783,6 +808,15 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFZCell(i) = JFZCell(i) + JFZ(lx,ly,lz,i) 
        JFECell(i) = JFECell(i) + JFE(lx,ly,lz,i)  
        !Jenergy = +...
+       ! 07/21/2025 - Thierry - begins here - added for PseudoTurbulence
+       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG11,RSG11(lx,ly,lz,i))
+       ! 07/21/2025 - Thierry - ends here
+       RSG11Cell(i) = RSG11Cell(i) + RSG11(lx,ly,lz,i)
+       
+       if(RSG11(lx,ly,lz,i).ne.0.0 .and. pRegion%irkStep.eq.3) then
+         write(68,*) global%currentTime, i, lx, ly, lz, RSG11Cell(i), RSG11(lx,ly,lz,i)
+       endif
+
        end do
        end do
        end do 
@@ -792,7 +826,23 @@ IF (global%piclFeedbackFlag == 1) THEN
        !JE correction
 
        JFECell(i) = JFECell(i) * 0.125 * pregion%grid%vol(i)
+        
+       RSG11Cell(i) = RSG11Cell(i) * 0.125 * pregion%grid%vol(i)
 
+
+!---------------------------------------------------------------------------------------
+! Thierry - Some sanity checks printing to be deleted later
+       if(pRegion%irkStep.eq.3) then
+         if(JFXCell(i) .ne. 0.0 .or. JFYCell(i) .ne. 0.0 .or. JFZCell(i) .ne. 0.0) then
+          write(89,*) global%currentTime, i, JFXCell(i), JFYCell(i), JFZCell(i)
+        endif
+       endif
+
+       if(RSG11Cell(i) .ne. 0.0  .and. pRegion%irkStep.eq.3) then
+        write(69,*) global%currentTime, i, RSG11Cell(i), pregion%grid%vol(i)
+       endif
+
+!---------------------------------------------------------------------------------------
        !energydotg = JFXCell(i) * ug(1) + JFYCell(i) * ug(2) + JFECell(i)
 
        energydotg = JFECell(i) ! includs KE feedback already
@@ -839,8 +889,11 @@ endif
 
 END IF ! global%piclFeedbackFlag
 
+!----------------------------------------------------------------------------------
+! 07/22/2025 - Thierry Daoud - THIS SHOULD NOT BE HERE !!!
 !SOLVE
-     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!!!!!!!!!     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!----------------------------------------------------------------------------------
 
 !
 
@@ -1104,6 +1157,18 @@ end DO
     END IF ! global%error
 
     DEALLOCATE(SDOZ,STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
+    DEALLOCATE(RSG11,STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
+    DEALLOCATE(RSG11Cell,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
       CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')

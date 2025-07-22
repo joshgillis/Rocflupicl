@@ -52,7 +52,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -60,7 +60,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -306,7 +306,6 @@
 !
 !-----------------------------------------------------------------------
 !
-!
 ! Evaluate ydot, the rhs of the equations of motion
 ! for the particles
 !
@@ -388,7 +387,6 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -486,7 +484,7 @@
          !   and is called above in Step 1b
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
-         elseif (qs_fluct_flag==2) then
+         elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
             call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct)
          endif
 
@@ -701,6 +699,26 @@
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
      >           qq )
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
+
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! We need to store the tensor calculations here in a certain array and then
+      ! access that in the mapping subroutine for when projection is needed
+      ! I tried accessing the array from the mapping subroutine directly but there 
+      ! was a mismatch in values with the exact simulation time
+
+            ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
+            ppiclf_rprop4(PPICLF_R_JRSG12,i) = 0.0d0 !Rsg(1,2)
+            ppiclf_rprop4(PPICLF_R_JRSG13,i) = 0.0d0 !Rsg(1,3)
+            ppiclf_rprop4(PPICLF_R_JRSG21,i) = 0.0d0 !Rsg(2,1)
+            ppiclf_rprop4(PPICLF_R_JRSG22,i) = 0.0d0 !Rsg(2,2)
+            ppiclf_rprop4(PPICLF_R_JRSG23,i) = 0.0d0 !Rsg(2,3)
+            ppiclf_rprop4(PPICLF_R_JRSG31,i) = 0.0d0 !Rsg(3,1)
+            ppiclf_rprop4(PPICLF_R_JRSG32,i) = 0.0d0 !Rsg(3,2)
+            ppiclf_rprop4(PPICLF_R_JRSG33,i) = 0.0d0 !Rsg(3,3) 
+            
+            if(iStage .eq. 3) then
+              write(71,*) ppiclf_time, i, ppiclf_rprop4(1,i)
+            endif
          endif 
 
 !
@@ -1147,7 +1165,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -1155,7 +1173,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i, iStage
       real*8 famx, famy, famz
@@ -1334,7 +1352,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -1342,7 +1360,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i
       real*8 gamma,mp,phi,re
@@ -1741,7 +1759,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -1749,7 +1767,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -1919,7 +1937,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -1927,7 +1945,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i, iStage
       real*8 fqs_fluct(3)
@@ -1952,12 +1970,12 @@
      >       A1, A2, A3,                                   
      >       s_par, s_perp,                               
      >       xi_par, xi_perp,                             
-     >       Rsg_par, Rsg_perp                              
+     >       R_par, R_perp                              
       real*8 cd
       integer*4 m, n, c
       save c               ! <- retains value between calls
       data c /1/           ! <- initializes only once
-      real*8 R(3,3), R_rot(3,3), Q(3,3), Qt(3,3) 
+      real*8 R(3,3), Q(3,3), Qt(3,3) 
 !-------------------------------------------------------------
 
 !
@@ -2159,109 +2177,105 @@
 !---------------------------------------------------------------------------
 ! Pseudo-Turbulence Calculations starts here 
       ! if statement to check if flag is ON 
-
-      ! Constants taken from Osnes paper, Table 2 
-      F1  = -0.0022                               
-      F2  = -0.0219                               
-      F3  =  0.0932
-      F4  = -0.0135
-      F5  =  0.0361
-      F6  =  0.0403
-      F7  = -0.0761
-      F8  =  0.0599 
-      F9  =  0.0164 
-      F10 =  0.0453 
-      F11 = -0.0265 
-
-      G1  = -0.2867
-      G2  =  0.2176
-      G3  =  0.2826
-      G4  = -0.0644
-      G5  =  0.0466
-      G6  =  0.0973
-      G7  = -0.0081
-      G8  = -0.0235
-      
-      ! Lagrangian model
-
-      A1 = F1 / (rphip + F2)
-
-      if(CD_prime .lt. 0.0) then               
-        A2 = F3 - 0.2 * F3 * min(0.2, rphip)   
-      elseif(CD_prime .ge. 0.0) then           
-        A2 = F4 + F5/(rphip + F6) + F7 * rmachp
-      else                                     
-        print*, "CD_prime error", CD_prime     
-        stop                                   
-      endif                                    
-
-      s_par = F8 + F9/(rphip + F10) + F11 * rmachp 
-
-      call RANDOM_NUMBER(UnifRnd)
-      
-      z = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
-
-      xi_par = s_par * z 
-
-      ! Reynolds Subgrid Stress - Parallel Component
-      Rsg_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
-
-      !------
-      ! Finalize decision whether to set upper and lower bounds for 
-      ! rmachp, rphip, and rep based on data for outer bounds 
-      
-      !Mach = max(0.3d0, min(0.8d0, Mach))
-      
-      A3 = G1 + G2/(rphip + G3) + G4 * rmachp
-      s_perp = G5/(rphip + G6) + (G7*rep)/(300.0*rphip) + G8 
-
-      xi_perp = s_perp * z
-     
-      ! Reynolds Subgrid Stress - Perpendicular Component
-      Rsg_perp = 1.0 + A3 * CD_prime / cd + xi_perp
-
-
+      if(pseudoTurb_flag==1) then
+  
+        ! Constants taken from Osnes paper, Table 2 
+        F1  = -0.0022                               
+        F2  = -0.0219                               
+        F3  =  0.0932
+        F4  = -0.0135
+        F5  =  0.0361
+        F6  =  0.0403
+        F7  = -0.0761
+        F8  =  0.0599 
+        F9  =  0.0164 
+        F10 =  0.0453 
+        F11 = -0.0265 
+  
+        G1  = -0.2867
+        G2  =  0.2176
+        G3  =  0.2826
+        G4  = -0.0644
+        G5  =  0.0466
+        G6  =  0.0973
+        G7  = -0.0081
+        G8  = -0.0235
+        
+        ! Lagrangian model
+  
+        A1 = F1 / (rphip + F2)
+  
+        if(CD_prime .lt. 0.0) then               
+          A2 = F3 - 0.2 * F3 * min(0.2, rphip)   
+        elseif(CD_prime .ge. 0.0) then           
+          A2 = F4 + F5/(rphip + F6) + F7 * rmachp
+        else                                     
+          print*, "CD_prime error", CD_prime     
+          stop                                   
+        endif                                    
+  
+        s_par = F8 + F9/(rphip + F10) + F11 * rmachp 
+  
+        call RANDOM_NUMBER(UnifRnd)
+        
+        z = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+  
+        xi_par = s_par * z 
+  
+        ! Reynolds Subgrid Stress - Parallel Component
+        R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
+  
+        !------
+        ! Finalize decision whether to set upper and lower bounds for 
+        ! rmachp, rphip, and rep based on data for outer bounds 
+        
+        !Mach = max(0.3d0, min(0.8d0, Mach))
+        
+        A3 = G1 + G2/(rphip + G3) + G4 * rmachp
+        s_perp = G5/(rphip + G6) + (G7*rep)/(300.0*rphip) + G8 
+  
+        xi_perp = s_perp * z
+       
+        ! Reynolds Subgrid Stress - Perpendicular Component
+        R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
+  
+  
 c---  Q = [avec | bvec | cvec], 3x3 matrix
-      do m=1,3
-        Q(m,1) = avec(m)
-        Q(m,2) = bvec(m)
-        Q(m,3) = cvec(m)
-      enddo
-
-      Qt = transpose(Q)
-
+        do m=1,3
+          Q(m,1) = avec(m)
+          Q(m,2) = bvec(m)
+          Q(m,3) = cvec(m)
+        enddo
+  
+        Qt = transpose(Q)
+  
 c--- R = |R_par,   0   ,   0   |
 c---     | 0   , R_perp,   0   |
 c---     | 0       0   , R_perp|
-
-      ! zero out matrices at first
-      do m=1,3
-        do n=1,3
-          R(m,n) = 0.0d0
-          R_rot(m,n) = 0.0d0
-        enddo
-      enddo
-
+  
+        ! zero out matrices at first
+        R = 0.0d0
+        Rsg = 0.0d0
+  
 c---  R matrix only has diagonal components
-      R(1,1) = Rsg_par
-      R(2,2) = Rsg_perp
-      R(3,3) = Rsg_perp
-
-c--- Now Rotate the matrix, R_rot = Q . R . Q^T
-
-      R_rot = matmul(Q, matmul(R,Qt))
-
-
-      if((ppiclf_time .gt. 2.0e-5) .and. iStage.eq.3) then
-        write(100, *) i, rep, rphip, rmachp,
+        R(1,1) = R_par
+        R(2,2) = R_perp
+        R(3,3) = R_perp
+  
+c--- Now Rotate the matrix, Rsg = Q . R . Q^T
+  
+        Rsg = matmul(Q, matmul(R,Qt))
+  
+  
+        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
+        write(100, *) ppiclf_time, i, rep, rphip, rmachp,
      >                cd, CD_prime, fqs_fluct,
-     >                Rsg_par, Rsg_perp,
-     >                G5/(rphip + G6),  
-     >                (G7*rep)/(300.0*rphip),
-     >                G8
-
-        c = c + 1
-      endif
+     >                R_par, R_perp, Rsg(1,1)
+  
+          c = c + 1
+        endif
+      
+      endif ! pseudoTurb_flag
 
       return
       end
@@ -2295,7 +2309,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -2303,7 +2317,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 famx, famy, famz, rmass_add
       real*8 rcd_am
@@ -3378,7 +3392,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -3386,7 +3400,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i
       real*8 qq, Nuss, Q_conv
@@ -3622,7 +3636,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -3630,7 +3644,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i,iStage
       real*8 taux, tauy, tauz
@@ -3814,7 +3828,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -3822,7 +3836,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i,iStage
       real*8 liftx, lifty, liftz
@@ -4003,7 +4017,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -4011,7 +4025,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage, iT
       real*8 fvux,fvuy,fvuz
       real*8 time,fH,factor,A,B,kernelVU
@@ -4374,7 +4388,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -4382,7 +4396,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i
       integer*4 j
@@ -4829,7 +4843,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
 
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_MapProjPart(map,y,ydot,ydotc,rprop)
+      subroutine ppiclf_user_MapProjPart(map,y,ydot,ydotc,rprop,rprop4)
 !
       implicit none
       include "PPICLF"
@@ -4840,6 +4854,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
       real*8 ydot (PPICLF_LRS)
       real*8 ydotc(PPICLF_LRS)
       real*8 rprop(PPICLF_LRP)
+      real*8 rprop4(PPICLF_LRP4)
 !
 ! Output:
 !
@@ -4862,6 +4877,19 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
       map(PPICLF_P_JPHIPW) = rprop(PPICLF_R_JVOLP)*y(PPICLF_JVZ)
       map(PPICLF_P_JPHIPT) = rprop(PPICLF_R_JVOLP)*y(PPICLF_JT)
 
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! Still thinking whether I should expand the map array to include the projected Reynolds
+      ! Stress Tensor values or just take them from rprop2 
+
+      map(PPICLF_P_JRSG11) = rprop4(PPICLF_R_JRSG11)
+      map(PPICLF_P_JRSG12) = rprop4(PPICLF_R_JRSG12)
+      map(PPICLF_P_JRSG13) = rprop4(PPICLF_R_JRSG13)
+      map(PPICLF_P_JRSG21) = rprop4(PPICLF_R_JRSG21)
+      map(PPICLF_P_JRSG22) = rprop4(PPICLF_R_JRSG22)
+      map(PPICLF_P_JRSG23) = rprop4(PPICLF_R_JRSG23)
+      map(PPICLF_P_JRSG31) = rprop4(PPICLF_R_JRSG31)
+      map(PPICLF_P_JRSG32) = rprop4(PPICLF_R_JRSG32)
+      map(PPICLF_P_JRSG33) = rprop4(PPICLF_R_JRSG33)
 
       return
       end
@@ -4887,7 +4915,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -4895,7 +4923,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i,j,k
 
 !
@@ -4934,7 +4962,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -4942,7 +4970,7 @@ c--- Now Rotate the matrix, R_rot = Q . R . Q^T
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, n, ic, k, iStage
 
 ! Needed for allreduce
@@ -6485,7 +6513,7 @@ c-----------------------------------------------------------------------
       logical partl    
       integer*4 lrf
       parameter(lrf = PPICLF_LRS*4 + PPICLF_LRP + PPICLF_LRP2
-     >       + PPICLF_LRP3)
+     >       + PPICLF_LRP3 + PPICLF_LRP4)
       real*8 rwork(lrf,PPICLF_LPART)
       integer*4 i, ic, j0
 !
@@ -6506,6 +6534,8 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop2(1,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop3(1,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(rwork(ic,i),ppiclf_rprop4(1,i),PPICLF_LRP4)
       enddo
 
       j0 = 4
@@ -6535,6 +6565,8 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(ppiclf_rprop2(1,i),rwork(ic,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(ppiclf_rprop3(1,i),rwork(ic,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(ppiclf_rprop4(1,i),rwork(ic,i),PPICLF_LRP4)
       enddo
         
       return
@@ -6619,7 +6651,8 @@ c CREATING GHOST PARTICLES
       do ip=1,ppiclf_npart
 
          call ppiclf_user_MapProjPart(map,ppiclf_y(1,ip)
-     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip))
+     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip),
+     >                                              ppiclf_rprop4(1,ip))
 
 c        idum = 1
 c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)
@@ -6643,6 +6676,10 @@ c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)
             idum = idum + 1
             ppiclf_cp_map(idum,ip) = map(j)
          enddo
+
+         write(72,*) ppiclf_time, ip, 
+     >               ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+11,ip),
+     >               ppiclf_rprop4(1,ip)
 
          rxval = ppiclf_cp_map(1,ip)
          ryval = ppiclf_cp_map(2,ip)
@@ -10680,6 +10717,9 @@ c1511 continue
       do j=1,PPICLF_LRP3
          ppiclf_rprop3(j,i) = 0.0d0
       ENDdo
+      do j=1,PPICLF_LRP4
+         ppiclf_rprop4(j,i) = 0.0d0
+      ENDdo
       do j=1,PPICLF_LIP
          ppiclf_iprop(j,i) = 0
       enddo
@@ -13187,6 +13227,8 @@ c----------------------------------------------------------------------
      >              (ppiclf_rprop2(1,ic),ppiclf_rprop2(1,i),PPICLF_LRP2)
                call ppiclf_copy
      >              (ppiclf_rprop3(1,ic),ppiclf_rprop3(1,i),PPICLF_LRP3)
+               call ppiclf_copy
+     >              (ppiclf_rprop4(1,ic),ppiclf_rprop4(1,i),PPICLF_LRP4)
                call ppiclf_icopy
      >              (ppiclf_iprop(1,ic) ,ppiclf_iprop(1,i) ,PPICLF_LIP)
             ENDif
@@ -13372,6 +13414,14 @@ c----------------------------------------------------------------------
             ic = ic + 1
             rproj(ic,ip) = ppiclf_cp_map(j,ip)*multfci
          ENDdo
+
+         write(90,*) ppiclf_time,
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+2,ip), ! JFX
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+3,ip), ! JFY
+     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+4,ip) ! JFZ
+
+         write(70,*) ppiclf_time, ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP
+     >    +11,ip), rproj(15,ip)
                     
          iproj(1,ip)  = ppiclf_iprop(8,ip)
          iproj(2,ip)  = ppiclf_iprop(9,ip)
@@ -13615,6 +13665,7 @@ c----------------------------------------------------------------------
             END if ! if3d
 
              rexp = 1.0 / evol
+             print*, "evol =", evol
            do k=1,PPICLF_LEZ
            do j=1,PPICLF_LEY
            do i=1,PPICLF_LEX

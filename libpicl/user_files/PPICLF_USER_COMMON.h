@@ -45,8 +45,8 @@
       common /user_fluct02/ upmean, vpmean, wpmean, phipmean
       common /user_fluct03/ u2pmean, v2pmean, w2pmean
 
-      real*8 UnifRnd(6)
-      common /user_fluct02/ UnifRnd
+      real*8 UnifRnd(6), Rsg(3,3)
+      common /user_fluct02/ UnifRnd, Rsg
 
 !
 ! For ppiclf_user_debug.f
@@ -106,3 +106,4 @@
      >                                xrot, vrot
       common /solve_InitAngularPeriodic03/ x_per_min, x_per_max,
      >  y_per_min, y_per_max, z_per_min, z_per_max
+     

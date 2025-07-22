@@ -85,7 +85,7 @@ SUBROUTINE PICL_ReadPiclSection( global )
   INTEGER :: nVals
 
   INTEGER :: iReg
-  INTEGER, PARAMETER :: NVALS_MAX = 28
+  INTEGER, PARAMETER :: NVALS_MAX = 29
 
   CHARACTER(20) :: keys(NVALS_MAX)
 
@@ -131,6 +131,7 @@ SUBROUTINE PICL_ReadPiclSection( global )
   keys(26)  = 'ROUT'
   keys(27)  = 'SUBBIN'
   keys(28)  = 'REACTIVE'
+  keys(29)  = 'PSEUDOTURB'
  
   CALL ReadSection( global,IF_INPUT,nVals,keys(1:nVals),vals(1:nVals), & 
                     defined(1:nVals) ) 
@@ -251,6 +252,10 @@ SUBROUTINE PICL_ReadPiclSection( global )
 
   IF (defined(28) .EQV. .TRUE. ) THEN
     global%piclBurnRateFlag = vals(28)
+  END IF
+
+  IF (defined(29) .EQV. .TRUE. ) THEN
+    global%piclPseudoTurbFlag = NINT(vals(29))
   END IF
 
 ! finalize

@@ -119,7 +119,11 @@ USE RFLU_ModConvertCv, ONLY: RFLU_ConvertCvCons2Prim, &
 
 ! rprop: 64
 
-! map: 10
+! rprop4: PPICLF_LRP4
+
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
+
 
 
 
@@ -208,6 +212,8 @@ TYPE(t_grid), POINTER :: pGrid
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOX
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOY
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: SDOZ
+  REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: RSG11
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: RSG11Cell
 
   ! TLJ - added for Feedback term - 04/01/2025
   INTEGER, DIMENSION(:), ALLOCATABLE :: varInfoPicl
@@ -264,243 +270,255 @@ TYPE(t_grid), POINTER :: pGrid
     ALLOCATE(rhoF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,236,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,238,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(uxF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,242,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,244,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(uyF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,248,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,250,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(uzF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,254,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,256,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(csF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,260,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,262,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(tpF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,266,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,268,'PPICLF:xGrid')
     END IF ! global%error    
 
     ALLOCATE(ppF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,272,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,274,'PPICLF:xGrid')
     END IF ! global%error    
 
     ALLOCATE(vfP(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,278,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,280,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(dpxF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,284,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,286,'PPICLF:xGrid')
     END IF ! global%error
     
     ALLOCATE(dpyF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,290,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,292,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(dpzF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,296,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,298,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDRX(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,302,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,304,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDRY(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,308,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,310,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDRZ(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,314,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,316,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(rhsR(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,320,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,322,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(pGcX(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,326,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,328,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(pGcY(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,332,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,334,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(pGcZ(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,338,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,340,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFX(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,344,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,346,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFXCell(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,350,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,352,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFY(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,356,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,358,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFYCell(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,362,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,364,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFZ(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,368,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,370,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFZCell(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,374,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,376,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFECell(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,380,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,382,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(JFE(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,386,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,388,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(PhiP(nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,392,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,394,'PPICLF:xGrid')
     END IF ! global%error
 
     IF (pRegion%mixtInput%axiFlag) THEN
       ALLOCATE(YTEMP(2,2,2,nCells),STAT=errorFlag)
       global%error = errorFlag
       IF ( global%error /= ERR_NONE ) THEN
-        CALL ErrorStop(global,ERR_ALLOCATE,399,'PPICLF:xGrid')
+        CALL ErrorStop(global,ERR_ALLOCATE,401,'PPICLF:xGrid')
       END IF ! global%error
     ENDIF
 
     ALLOCATE(domgdx(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,406,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,408,'PPICLF:xGrid')
     END IF ! global%error
     
     ALLOCATE(domgdy(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,412,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,414,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(domgdz(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,418,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,420,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(drhodx(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,424,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,426,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(drhody(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,430,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,432,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(drhodz(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,436,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,438,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(dpvxF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,442,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,444,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(dpvyF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,448,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,450,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(dpvzF(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,454,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,456,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDOX(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,460,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,462,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDOY(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,466,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,468,'PPICLF:xGrid')
     END IF ! global%error
 
     ALLOCATE(SDOZ(2,2,2,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,472,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_ALLOCATE,474,'PPICLF:xGrid')
+    END IF ! global%error
+
+    ALLOCATE(RSG11(2,2,2,nCells),STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_ALLOCATE,480,'PPICLF:xGrid')
+    END IF ! global%error
+
+    ALLOCATE(RSG11Cell(nCells),STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_ALLOCATE,486,'PPICLF:xGrid')
     END IF ! global%error
 
 
@@ -516,15 +534,20 @@ pGc => pRegion%mixt%gradCell
        JFXCell(i) = 0.0_RFREAL
        JFYCell(i) = 0.0_RFREAL
        JFZCell(i) = 0.0_RFREAL
+       RSG11Cell(i) = 0.0_RFREAL
        do lz=1,2
        do ly=1,2
        do lx=1,2 
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,2,JFX(lx,ly,lz,i))  
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,3,JFY(lx,ly,lz,i))
           call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,4,JFZ(lx,ly,lz,i))
+          ! 07/21/2025 - Thierry - begins here - added for PseudoTurbulence - not sure if I need it here ?
+          call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,11,RSG11(lx,ly,lz,i))
+          ! 07/21/2025 - Thierry - ends here
           JFXCell(i) = JFXCell(i) + JFX(lx,ly,lz,i)
           JFYCell(i) = JFYCell(i) + JFY(lx,ly,lz,i) 
           JFZCell(i) = JFZCell(i) + JFZ(lx,ly,lz,i) 
+          RSG11Cell(i) = RSG11Cell(i) + RSG11(lx,ly,lz,i)
        end do
        end do
        end do 
@@ -533,6 +556,7 @@ pGc => pRegion%mixt%gradCell
        JFXCell(i) = JFXCell(i) * 0.125 * pregion%grid%vol(i)
        JFYCell(i) = JFYCell(i) * 0.125 * pregion%grid%vol(i)
        JFZCell(i) = JFZCell(i) * 0.125 * pregion%grid%vol(i)
+       RSG11Cell(i) = RSG11Cell(i) * 0.125 * pregion%grid%vol(i)
        pregion%mixt%piclFeedback(1,i) = JFXCell(i)
        pregion%mixt%piclFeedback(2,i) = JFYCell(i)
        pregion%mixt%piclFeedback(3,i) = JFZCell(i)
@@ -749,7 +773,7 @@ pGc => pRegion%mixt%gradCell
 ! Davin - added pressure 02/22/2025
       IF (30 .NE. 30) THEN
          write(*,*) "Error: PPICLF_LRP_INT must be set to 30"
-         CALL ErrorStop(global,ERR_INVALID_VALUE ,721,'PPICLF:LRP_INT')
+         CALL ErrorStop(global,ERR_INVALID_VALUE ,741,'PPICLF:LRP_INT')
       endif
 
       CALL ppiclf_solve_InterpFieldUser(2,rhoF)
@@ -783,7 +807,11 @@ pGc => pRegion%mixt%gradCell
       CALL ppiclf_solve_InterpFieldUser(63,SDOY)  
       CALL ppiclf_solve_InterpFieldUser(64,SDOZ)  
 
-
+!---------------------------------------------------------------------------------------
+! 07/22/2025 - Thierry Daoud - Integration Should Happen Before Projecting Back to the Fluid
+!SOLVE
+     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!---------------------------------------------------------------------------------------
 !FEED BACK TERM
 !Fill arrays for interp field
 IF (global%piclFeedbackFlag == 1) THEN
@@ -801,6 +829,7 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFYCell(i) = 0.0_RFREAL
        JFZCell(i) = 0.0_RFREAL
        JFECell(i) = 0.0_RFREAL
+       RSG11Cell(i) = 0.0_RFREAL
        do lz=1,2
        do ly=1,2
        do lx=1,2 
@@ -814,6 +843,15 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFZCell(i) = JFZCell(i) + JFZ(lx,ly,lz,i) 
        JFECell(i) = JFECell(i) + JFE(lx,ly,lz,i)  
        !Jenergy = +...
+       ! 07/21/2025 - Thierry - begins here - added for PseudoTurbulence
+       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,11,RSG11(lx,ly,lz,i))
+       ! 07/21/2025 - Thierry - ends here
+       RSG11Cell(i) = RSG11Cell(i) + RSG11(lx,ly,lz,i)
+       
+       if(RSG11(lx,ly,lz,i).ne.0.0 .and. pRegion%irkStep.eq.3) then
+         write(68,*) global%currentTime, i, lx, ly, lz, RSG11Cell(i), RSG11(lx,ly,lz,i)
+       endif
+
        end do
        end do
        end do 
@@ -823,7 +861,23 @@ IF (global%piclFeedbackFlag == 1) THEN
        !JE correction
 
        JFECell(i) = JFECell(i) * 0.125 * pregion%grid%vol(i)
+        
+       RSG11Cell(i) = RSG11Cell(i) * 0.125 * pregion%grid%vol(i)
 
+
+!---------------------------------------------------------------------------------------
+! Thierry - Some sanity checks printing to be deleted later
+       if(pRegion%irkStep.eq.3) then
+         if(JFXCell(i) .ne. 0.0 .or. JFYCell(i) .ne. 0.0 .or. JFZCell(i) .ne. 0.0) then
+          write(89,*) global%currentTime, i, JFXCell(i), JFYCell(i), JFZCell(i)
+        endif
+       endif
+
+       if(RSG11Cell(i) .ne. 0.0  .and. pRegion%irkStep.eq.3) then
+        write(69,*) global%currentTime, i, RSG11Cell(i), pregion%grid%vol(i)
+       endif
+
+!---------------------------------------------------------------------------------------
        !energydotg = JFXCell(i) * ug(1) + JFYCell(i) * ug(2) + JFECell(i)
 
        energydotg = JFECell(i) ! includs KE feedback already
@@ -833,22 +887,22 @@ IF (IsNan(JFXCell(i)) .EQV. .TRUE.) THEN
         write(*,*) "JFY",i,JFYCell(i)
         write(*,*) "JFZ",i,JFZCell(i)
         write(*,*) "pregionvol", pregion%grid%vol(i)
-        CALL ErrorStop(global,ERR_INVALID_VALUE ,805,'PPICLF:Broken PX')
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,855,'PPICLF:Broken PX')
 endif
 IF (IsNan(JFYCell(i)) .EQV. .TRUE.) THEN
         write(*,*) "BROKEN-PY",i,JFYCell(i),ug(1),ug(2),ug(3)
         write(*,*) "pregionvol", pregion%grid%vol(i)
-        CALL ErrorStop(global,ERR_INVALID_VALUE ,810,'PPICLF:Broken PY')
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,860,'PPICLF:Broken PY')
 endif
 IF (IsNan(JFZCell(i)) .EQV. .TRUE.) THEN
         write(*,*) "BROKEN-PZ",i,JFZCell(i),ug(1),ug(2),ug(3)
         write(*,*) "pregionvol", pregion%grid%vol(i)
-        CALL ErrorStop(global,ERR_INVALID_VALUE ,815,'PPICLF:Broken PY')
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,865,'PPICLF:Broken PY')
 endif
 IF (IsNan(energydotg) .EQV. .TRUE.) THEN
         write(*,*) "BROKEN-PE",energydotg,i,JFXCell(i),ug(1),JFYCell(i),ug(2),pregion%grid%vol(i),pRegion%mixt%piclGeom
         write(*,*) "pregionvol", pregion%grid%vol(i)
-        CALL ErrorStop(global,ERR_INVALID_VALUE ,820,'PPICLF:Broken PE')
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,870,'PPICLF:Broken PE')
 endif
 
         pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
@@ -870,8 +924,11 @@ endif
 
 END IF ! global%piclFeedbackFlag
 
+!----------------------------------------------------------------------------------
+! 07/22/2025 - Thierry Daoud - THIS SHOULD NOT BE HERE !!!
 !SOLVE
-     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!!!!!!!!!     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
+!----------------------------------------------------------------------------------
 
 !
 
@@ -902,242 +959,254 @@ end DO
       DEALLOCATE(YTEMP,STAT=errorFlag)
       global%error = errorFlag
       IF ( global%error /= ERR_NONE ) THEN
-        CALL ErrorStop(global,ERR_DEALLOCATE,874,'PPICLF:xGrid')
+        CALL ErrorStop(global,ERR_DEALLOCATE,927,'PPICLF:xGrid')
       END IF ! global%error
     ENDIF
 
     DEALLOCATE(rhoF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,881,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,934,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(uxF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,887,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,940,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(uyF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,893,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,946,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(uzF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,899,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,952,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(csF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,905,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,958,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(tpF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,911,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,964,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(ppF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,917,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,970,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(vfP,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,923,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,976,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpxF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,929,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,982,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpyF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,935,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,988,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpzF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,941,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,994,'PPICLF:xGrid')
     END IF ! global%error
         
     DEALLOCATE(SDRX,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,947,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1000,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(SDRY,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,953,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1006,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(SDRZ,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,959,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1012,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(rhsR,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,965,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1018,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(pGcX,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,971,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1024,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(pGcY,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,977,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1030,'PPICLF:xGrid')
     END IF !global%error    
 
     DEALLOCATE(pGcZ,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,983,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1036,'PPICLF:xGrid')
     END IF !global%error    
 
     DEALLOCATE(JFX,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,989,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1042,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFXCell,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,995,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1048,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFY,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1001,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1054,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFYCell,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1007,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1060,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFZ,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1013,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1066,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFZCell,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1019,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1072,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFE,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1025,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1078,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(JFECell,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1031,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1084,'PPICLF:xGrid')
     END IF ! global%error    
 
     DEALLOCATE(PhiP,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1037,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1090,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(domgdx,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1043,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1096,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(domgdy,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1049,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1102,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(domgdz,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1055,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1108,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(drhodx,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1061,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1114,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(drhody,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1067,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1120,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(drhodz,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1073,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1126,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpvxF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1079,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1132,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpvyF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1085,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1138,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(dpvzF,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1091,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1144,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(SDOX,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1097,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1150,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(SDOY,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1103,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1156,'PPICLF:xGrid')
     END IF ! global%error
 
     DEALLOCATE(SDOZ,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,1109,'PPICLF:xGrid')
+      CALL ErrorStop(global,ERR_DEALLOCATE,1162,'PPICLF:xGrid')
+    END IF ! global%error
+
+    DEALLOCATE(RSG11,STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_DEALLOCATE,1168,'PPICLF:xGrid')
+    END IF ! global%error
+
+    DEALLOCATE(RSG11Cell,STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_DEALLOCATE,1174,'PPICLF:xGrid')
     END IF ! global%error
 
 

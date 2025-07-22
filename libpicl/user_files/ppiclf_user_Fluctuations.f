@@ -43,7 +43,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -51,7 +51,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -221,7 +221,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       real*8 :: rmu_ref, tref, suth, ksp, erest
       common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
      >   collisional_flag, heattransfer_flag, feedback_flag,
@@ -229,7 +229,7 @@
      >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
      >   qs_fluct_filter_adapt_flag, ksp, erest,
      >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
 
       integer*4 i, iStage
       real*8 fqs_fluct(3)
@@ -259,7 +259,7 @@
       integer*4 m, n, c
       save c               ! <- retains value between calls
       data c /1/           ! <- initializes only once
-      real*8 R(3,3), R_rot(3,3), Q(3,3), Qt(3,3) 
+      real*8 R(3,3), Q(3,3), Qt(3,3) 
 !-------------------------------------------------------------
 
 !
@@ -461,109 +461,105 @@
 !---------------------------------------------------------------------------
 ! Pseudo-Turbulence Calculations starts here 
       ! if statement to check if flag is ON 
-
-      ! Constants taken from Osnes paper, Table 2 
-      F1  = -0.0022                               
-      F2  = -0.0219                               
-      F3  =  0.0932
-      F4  = -0.0135
-      F5  =  0.0361
-      F6  =  0.0403
-      F7  = -0.0761
-      F8  =  0.0599 
-      F9  =  0.0164 
-      F10 =  0.0453 
-      F11 = -0.0265 
-
-      G1  = -0.2867
-      G2  =  0.2176
-      G3  =  0.2826
-      G4  = -0.0644
-      G5  =  0.0466
-      G6  =  0.0973
-      G7  = -0.0081
-      G8  = -0.0235
-      
-      ! Lagrangian model
-
-      A1 = F1 / (rphip + F2)
-
-      if(CD_prime .lt. 0.0) then               
-        A2 = F3 - 0.2 * F3 * min(0.2, rphip)   
-      elseif(CD_prime .ge. 0.0) then           
-        A2 = F4 + F5/(rphip + F6) + F7 * rmachp
-      else                                     
-        print*, "CD_prime error", CD_prime     
-        stop                                   
-      endif                                    
-
-      s_par = F8 + F9/(rphip + F10) + F11 * rmachp 
-
-      call RANDOM_NUMBER(UnifRnd)
-      
-      z = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
-
-      xi_par = s_par * z 
-
-      ! Reynolds Subgrid Stress - Parallel Component
-      R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
-
-      !------
-      ! Finalize decision whether to set upper and lower bounds for 
-      ! rmachp, rphip, and rep based on data for outer bounds 
-      
-      !Mach = max(0.3d0, min(0.8d0, Mach))
-      
-      A3 = G1 + G2/(rphip + G3) + G4 * rmachp
-      s_perp = G5/(rphip + G6) + (G7*rep)/(300.0*rphip) + G8 
-
-      xi_perp = s_perp * z
-     
-      ! Reynolds Subgrid Stress - Perpendicular Component
-      R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
-
-
+      if(pseudoTurb_flag==1) then
+  
+        ! Constants taken from Osnes paper, Table 2 
+        F1  = -0.0022                               
+        F2  = -0.0219                               
+        F3  =  0.0932
+        F4  = -0.0135
+        F5  =  0.0361
+        F6  =  0.0403
+        F7  = -0.0761
+        F8  =  0.0599 
+        F9  =  0.0164 
+        F10 =  0.0453 
+        F11 = -0.0265 
+  
+        G1  = -0.2867
+        G2  =  0.2176
+        G3  =  0.2826
+        G4  = -0.0644
+        G5  =  0.0466
+        G6  =  0.0973
+        G7  = -0.0081
+        G8  = -0.0235
+        
+        ! Lagrangian model
+  
+        A1 = F1 / (rphip + F2)
+  
+        if(CD_prime .lt. 0.0) then               
+          A2 = F3 - 0.2 * F3 * min(0.2, rphip)   
+        elseif(CD_prime .ge. 0.0) then           
+          A2 = F4 + F5/(rphip + F6) + F7 * rmachp
+        else                                     
+          print*, "CD_prime error", CD_prime     
+          stop                                   
+        endif                                    
+  
+        s_par = F8 + F9/(rphip + F10) + F11 * rmachp 
+  
+        call RANDOM_NUMBER(UnifRnd)
+        
+        z = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+  
+        xi_par = s_par * z 
+  
+        ! Reynolds Subgrid Stress - Parallel Component
+        R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
+  
+        !------
+        ! Finalize decision whether to set upper and lower bounds for 
+        ! rmachp, rphip, and rep based on data for outer bounds 
+        
+        !Mach = max(0.3d0, min(0.8d0, Mach))
+        
+        A3 = G1 + G2/(rphip + G3) + G4 * rmachp
+        s_perp = G5/(rphip + G6) + (G7*rep)/(300.0*rphip) + G8 
+  
+        xi_perp = s_perp * z
+       
+        ! Reynolds Subgrid Stress - Perpendicular Component
+        R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
+  
+  
 c---  Q = [avec | bvec | cvec], 3x3 matrix
-      do m=1,3
-        Q(m,1) = avec(m)
-        Q(m,2) = bvec(m)
-        Q(m,3) = cvec(m)
-      enddo
-
-      Qt = transpose(Q)
-
+        do m=1,3
+          Q(m,1) = avec(m)
+          Q(m,2) = bvec(m)
+          Q(m,3) = cvec(m)
+        enddo
+  
+        Qt = transpose(Q)
+  
 c--- R = |R_par,   0   ,   0   |
 c---     | 0   , R_perp,   0   |
 c---     | 0       0   , R_perp|
-
-      ! zero out matrices at first
-      do m=1,3
-        do n=1,3
-          R(m,n) = 0.0d0
-          R_rot(m,n) = 0.0d0
-        enddo
-      enddo
-
+  
+        ! zero out matrices at first
+        R = 0.0d0
+        Rsg = 0.0d0
+  
 c---  R matrix only has diagonal components
-      R(1,1) = R_par
-      R(2,2) = R_perp
-      R(3,3) = R_perp
-
-c--- Now Rotate the matrix, R_rot = Q . R . Q^T
-
-      R_rot = matmul(Q, matmul(R,Qt))
-
-
-      if((ppiclf_time .gt. 2.0e-5) .and. iStage.eq.3) then
-        write(100, *) i, rep, rphip, rmachp,
+        R(1,1) = R_par
+        R(2,2) = R_perp
+        R(3,3) = R_perp
+  
+c--- Now Rotate the matrix, Rsg = Q . R . Q^T
+  
+        Rsg = matmul(Q, matmul(R,Qt))
+  
+  
+        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
+        write(100, *) ppiclf_time, i, rep, rphip, rmachp,
      >                cd, CD_prime, fqs_fluct,
-     >                Rsg_par, Rsg_perp,
-     >                G5/(rphip + G6),  
-     >                (G7*rep)/(300.0*rphip),
-     >                G8
-
-        c = c + 1
-      endif
+     >                R_par, R_perp, Rsg(1,1)
+  
+          c = c + 1
+        endif
+      
+      endif ! pseudoTurb_flag
 
       return
       end
