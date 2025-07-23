@@ -707,14 +707,14 @@
       ! was a mismatch in values with the exact simulation time
 
             ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
-            ppiclf_rprop4(PPICLF_R_JRSG12,i) = 0.0d0 !Rsg(1,2)
-            ppiclf_rprop4(PPICLF_R_JRSG13,i) = 0.0d0 !Rsg(1,3)
-            ppiclf_rprop4(PPICLF_R_JRSG21,i) = 0.0d0 !Rsg(2,1)
-            ppiclf_rprop4(PPICLF_R_JRSG22,i) = 0.0d0 !Rsg(2,2)
-            ppiclf_rprop4(PPICLF_R_JRSG23,i) = 0.0d0 !Rsg(2,3)
-            ppiclf_rprop4(PPICLF_R_JRSG31,i) = 0.0d0 !Rsg(3,1)
-            ppiclf_rprop4(PPICLF_R_JRSG32,i) = 0.0d0 !Rsg(3,2)
-            ppiclf_rprop4(PPICLF_R_JRSG33,i) = 0.0d0 !Rsg(3,3) 
+            ppiclf_rprop4(PPICLF_R_JRSG12,i) = Rsg(1,2)
+            ppiclf_rprop4(PPICLF_R_JRSG13,i) = Rsg(1,3)
+            ppiclf_rprop4(PPICLF_R_JRSG21,i) = Rsg(2,1)
+            ppiclf_rprop4(PPICLF_R_JRSG22,i) = Rsg(2,2)
+            ppiclf_rprop4(PPICLF_R_JRSG23,i) = Rsg(2,3)
+            ppiclf_rprop4(PPICLF_R_JRSG31,i) = Rsg(3,1)
+            ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
+            ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
             
             if(iStage .eq. 3) then
               write(71,*) ppiclf_time, i, ppiclf_rprop4(1,i)

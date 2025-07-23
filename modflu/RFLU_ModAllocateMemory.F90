@@ -516,6 +516,10 @@ SUBROUTINE RFLU_AllocateMemorySolCv(pRegion)
      ! 03/19/2025 - Thierry - begins here
      ALLOCATE(pRegion%mixt%piclVFg(1,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclgradRhog(3,1,pGrid%nCellsTot),STAT=errorFlag)
+     ! Particle PseudoTurbulence - Reynolds Stress Tensor 
+     ALLOCATE(pRegion%mixt%piclPhiRSG(9,pGrid%nCellsTot),STAT=errorFlag)
+     ALLOCATE(pRegion%mixt%piclgradPhiRSG(3,9,pGrid%nCellsTot),STAT=errorFlag)
+     ALLOCATE(pRegion%mixt%piclDivPhiRSG(3,pGrid%nCells),STAT=errorFlag)
      global%error = errorFlag
      IF (global%error /= ERR_NONE) THEN
         CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'pRegion%mixt%piclfVF')

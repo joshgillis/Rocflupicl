@@ -2674,6 +2674,7 @@ MODULE RFLU_ModReadWriteFlow
       WRITE(iFile) (pRegion%mixt%piclVF(j),j=1,pGrid%nCellsTot)
       ! 03/20/2025 - Thierry - begins here
       WRITE(iFile) (pRegion%mixt%piclgradRhog(:,1,j),j=1,pGrid%nCellsTot)
+      WRITE(iFile) (pRegion%mixt%piclDivPhiRSG(:,j),j=1,pGrid%nCells)
       ! 03/20/2025 - Thierry - ends here
 
   END IF
@@ -2704,7 +2705,7 @@ MODULE RFLU_ModReadWriteFlow
     CLOSE(iFile,IOSTAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_FILE_CLOSE,2748,iFileName)
+      CALL ErrorStop(global,ERR_FILE_CLOSE,2749,iFileName)
     END IF ! global%error
 
 ! ******************************************************************************
@@ -2764,7 +2765,11 @@ MODULE RFLU_ModReadWriteFlow
 
 ! rprop: 64
 
-! map: 10
+! rprop4: PPICLF_LRP4
+
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
+
 
 
 
@@ -3019,6 +3024,10 @@ MODULE RFLU_ModReadWriteFlow
          varY=pRegion%mixt%piclgradRhog(2,1,1:Ne), &
          varZ=pRegion%mixt%piclgradRhog(3,1,1:Ne))
       ! 03/20/2025 - Thierry - ends here
+    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Div Phi RSG', &
+         varX=pRegion%mixt%piclDivPhiRSG(1,1:Ne), &
+         varY=pRegion%mixt%piclDivPhiRSG(2,1:Ne), &
+         varZ=pRegion%mixt%piclDivPhiRSG(3,1:Ne))
   END IF
 
 
@@ -3121,6 +3130,7 @@ MODULE RFLU_ModReadWriteFlow
       E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Gradient Gas Density',& 
                                                                tp='Float64' )
       ! 03/20/2025 - Thierry - ends here
+      E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Div Phi RSG', tp='Float64' )
   END IF
 
 
@@ -3537,7 +3547,7 @@ END IF
          IOSTAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_FILE_OPEN,3935,iFileName)
+      CALL ErrorStop(global,ERR_FILE_OPEN,3941,iFileName)
     END IF ! global%error
 
     END IF
@@ -3624,7 +3634,7 @@ END IF
       CLOSE(iFile,IOSTAT=errorFlag)
       global%error = errorFlag
       IF ( global%error /= ERR_NONE ) THEN
-        CALL ErrorStop(global,ERR_FILE_CLOSE,4056,iFileName)
+        CALL ErrorStop(global,ERR_FILE_CLOSE,4062,iFileName)
       END IF ! global%error
     END IF ! masterproc
 
@@ -3726,7 +3736,7 @@ END IF
          CALL RFLU_PICL_WriteFlowBinary(pRegion)
         END IF
       ELSE
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4178)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4184)
       END IF ! global%solutFormat
 
 ! ******************************************************************************
@@ -3757,7 +3767,7 @@ END IF
           CALL SPEC_RFLU_WriteEEvBinary(pRegion)
         END IF ! pRegion%specInput%nSpeciesEE
       ELSE
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4238)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4244)
       END IF ! global%solutFormat
     END IF ! global%specUsed
 
