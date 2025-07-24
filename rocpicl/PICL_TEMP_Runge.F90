@@ -187,7 +187,6 @@ TYPE(t_grid), POINTER :: pGrid
   REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: JRSG33
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: JRSGCell
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: DivPhiRSG
-  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: PhiG
   INTEGER(KIND=4) :: j
 !---------------------------------------------------------------  
 
@@ -548,21 +547,11 @@ TYPE(t_grid), POINTER :: pGrid
       CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
     END IF ! global%error
 
-    ALLOCATE(PhiG(nCells),STAT=errorFlag)
-    global%error = errorFlag
-    IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
-    END IF ! global%error
-
     ALLOCATE(DivPhiRSG(3,nCells),STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
       CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
     END IF ! global%error
-
-  print*, "Size PhiG =", SIZE(PhiG)
-  print*, "ncells =", ncells
-  print*, "pGrid%nCellsTot =", pGrid%nCellsTot
 !---------------------------------------------------------------  
 
 
@@ -816,7 +805,7 @@ pGc => pRegion%mixt%gradCell
 
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JRHOF,rhoF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUX,uxF)
-      CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUY,uyF)
+      CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUY,uxF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUZ,uzF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JDPDX,dpxF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JDPDY,dpyF)  
@@ -867,7 +856,10 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFYCell(i) = 0.0_RFREAL
        JFZCell(i) = 0.0_RFREAL
        JFECell(i) = 0.0_RFREAL
+
        JRSGCell(:,i) = 0.0_RFREAL
+       DivPhiRSG(:,i) = 0.0_RFREAL
+
        do lz=1,2
        do ly=1,2
        do lx=1,2 
@@ -883,36 +875,32 @@ IF (global%piclFeedbackFlag == 1) THEN
        !Jenergy = +...
 !---------------------------------------------------------------------------------------
        ! 07/21/2025 - Thierry - begins here - added for PseudoTurbulence
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG11,JRSG11(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG12,JRSG12(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG13,JRSG13(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG21,JRSG21(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG22,JRSG22(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG23,JRSG23(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG31,JRSG31(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG32,JRSG32(lx,ly,lz,i))
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG33,JRSG33(lx,ly,lz,i))
+       if(global%piclPseudoTurbFlag .eq. 1) then
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG11,JRSG11(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG12,JRSG12(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG13,JRSG13(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG21,JRSG21(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG22,JRSG22(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG23,JRSG23(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG31,JRSG31(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG32,JRSG32(lx,ly,lz,i))
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JRSG33,JRSG33(lx,ly,lz,i))
 
-       call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JPHIP,vfP(lx,ly,lz,i))
-       PhiP(i) = PhiP(i) +  (0.125*vfP(lx,ly,lz,i))*pRegion%grid%vol(i) ! particle vol frac
+         call ppiclf_solve_GetProFldIJKEF(lx,ly,lz,i,PPICLF_P_JPHIP,vfP(lx,ly,lz,i))
+         PhiP(i) = PhiP(i) +  (0.125*vfP(lx,ly,lz,i))*pRegion%grid%vol(i) ! particle vol frac
 
-       ! 07/21/2025 - Thierry - ends here
-       JRSGCell(1,i) = JRSGCell(1,i) + JRSG11(lx,ly,lz,i)
-       JRSGCell(2,i) = JRSGCell(2,i) + JRSG12(lx,ly,lz,i)
-       JRSGCell(3,i) = JRSGCell(3,i) + JRSG13(lx,ly,lz,i)
-       JRSGCell(4,i) = JRSGCell(4,i) + JRSG21(lx,ly,lz,i)
-       JRSGCell(5,i) = JRSGCell(5,i) + JRSG22(lx,ly,lz,i)
-       JRSGCell(6,i) = JRSGCell(6,i) + JRSG23(lx,ly,lz,i)
-       JRSGCell(7,i) = JRSGCell(7,i) + JRSG31(lx,ly,lz,i)
-       JRSGCell(8,i) = JRSGCell(8,i) + JRSG32(lx,ly,lz,i)
-       JRSGCell(9,i) = JRSGCell(9,i) + JRSG33(lx,ly,lz,i)
-       
-       if(JRSG11(lx,ly,lz,i).ne.0.0 .and. pRegion%irkStep.eq.3) then
-         write(68,*) global%currentTime, i, lx, ly, lz, JRSGCell(1,i), &
-                      JRSG11(lx,ly,lz,i)*0.125*pregion%grid%vol(i) 
-       endif
+         ! 07/21/2025 - Thierry - ends here
+         JRSGCell(1,i) = JRSGCell(1,i) + JRSG11(lx,ly,lz,i)
+         JRSGCell(2,i) = JRSGCell(2,i) + JRSG12(lx,ly,lz,i)
+         JRSGCell(3,i) = JRSGCell(3,i) + JRSG13(lx,ly,lz,i)
+         JRSGCell(4,i) = JRSGCell(4,i) + JRSG21(lx,ly,lz,i)
+         JRSGCell(5,i) = JRSGCell(5,i) + JRSG22(lx,ly,lz,i)
+         JRSGCell(6,i) = JRSGCell(6,i) + JRSG23(lx,ly,lz,i)
+         JRSGCell(7,i) = JRSGCell(7,i) + JRSG31(lx,ly,lz,i)
+         JRSGCell(8,i) = JRSGCell(8,i) + JRSG32(lx,ly,lz,i)
+         JRSGCell(9,i) = JRSGCell(9,i) + JRSG33(lx,ly,lz,i)
+       endif ! piclPseudoTurbFlag
 !---------------------------------------------------------------------------------------
-
        end do
        end do
        end do 
@@ -924,27 +912,13 @@ IF (global%piclFeedbackFlag == 1) THEN
        JFECell(i) = JFECell(i) * 0.125 * pregion%grid%vol(i)
         
        JRSGCell(:,i) = JRSGCell(:,i) * 0.125 * pregion%grid%vol(i)
-
-
-!---------------------------------------------------------------------------------------
-! Thierry - Some sanity checks printing to be deleted later
-       if(pRegion%irkStep.eq.3) then
-         if(JFXCell(i) .ne. 0.0 .or. JFYCell(i) .ne. 0.0 .or. JFZCell(i) .ne. 0.0) then
-          write(89,*) global%currentTime, i, JFXCell(i), JFYCell(i), JFZCell(i)
-        endif
-       endif
-
-       if(any(JRSGCell(:,i) .ne. 0.0d0) .and. pRegion%irkStep.eq.3) then
-        write(69,*) global%currentTime, i, JRSGCell(1,i), pregion%grid%vol(i)
-       endif
-
 !---------------------------------------------------------------------------------------
        !energydotg = JFXCell(i) * ug(1) + JFYCell(i) * ug(2) + JFECell(i)
 
        energydotg = JFECell(i) ! includs KE feedback already
 
 IF (IsNan(JFXCell(i)) .EQV. .TRUE.) THEN
-        write(*,*) "BROKEN-PX",i,JFXCell(i),ug(1),ug(2),ug(3)
+        write(*,*) "BROKEN-PX",i,JFXCell(i),ug(1),ug(2),ug(3), pRegion%irkStep
         write(*,*) "JFY",i,JFYCell(i)
         write(*,*) "JFZ",i,JFZCell(i)
         write(*,*) "pregionvol", pregion%grid%vol(i)
@@ -971,7 +945,6 @@ IF (ANY(IsNan(JRSGCell(:,i))) .EQV. .TRUE.) THEN
         CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken Reynolds SG')
 endif
 
-
         pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
                          = pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
                          + JFXCell(i)
@@ -991,95 +964,81 @@ endif
 !---------------------------------------------------------------------------------------
 ! Thierry - now we need to compute the interpolated Reynolds Stress components before
 !           projecting them back.
-!           I'm not sure if I should call ComputeCellGradients.MP again here or just 
-!           compute the needed gradients. I will probably go with the latter option
 !---------------------------------------------------------------------------------------
-! Div (\phi_g R_sg) - comma denotes partial derivative (,3 -> partial / partial x_3)
-! x-direction: (\phi R_11),1 + (\phi R_12),2 + (\phi R_13),3
-! y-direction: (\phi R_21),1 + (\phi R_22),2 + (\phi R_23),3
-! z-direction: (\phi R_31),1 + (\phi R_32),2 + (\phi R_33),3
-        
-!! This is how the Gradient of Feedback Forces is computed and I am trying 
-!! to do something similar to the Reynolds Stress Tensor
-!!
-!!    CALL RFLU_ComputeGradCellsWrapper(pRegion,1,3,1,3,varInfoPicl, &
-!!                                      pRegion%mixt%piclFeedback,&
-!!                                      pRegion%mixt%piclgradFeedback)
-!!    CALL RFLU_WENOGradCellsXYZWrapper(pRegion,1,3, &
-!!                                      pRegion%mixt%piclgradFeedback)
-!!    CALL RFLU_LimitGradCellsSimple(pRegion,1,3,1,3, &
-!!                                   pRegion%mixt%piclFeedback,&
-!!                                   piclcvInfo,&
-!!                                   pRegion%mixt%piclgradFeedback)
+         ! Temporarily storing the values in an array for plotting and viewing in ParaView
+         ! I should probably delete that later
+         pRegion%mixt%piclJF(1,:) = JFXCell(:)
+         pRegion%mixt%piclJF(2,:) = JFYCell(:)
+         pRegion%mixt%piclJF(3,:) = JFZCell(:)
 
-       PhiG(:) = 1.0_RFREAL - PhiP(:) ! gas vol frac
-        ! \phi_g R_sg
-        do j = 1, 9
-            pRegion%mixt%piclPhiRSG(j,:) = JRSGCell(j,:) * PhiG(:)
-          end do
-!        
-        ALLOCATE(varInfoPicl(9),STAT=errorFlag)
-        ALLOCATE(piclcvInfo(9),STAT=errorFlag)
-        varInfoPicl = [(j, j=1, 9)]
-        piclcvInfo = varInfoPicl
+       if(global%piclPseudoTurbFlag .eq. 1) then
+         ! \phi_g R_sg
+         do j = 1, 9
+           pRegion%mixt%piclPhiRSG(j,:) = JRSGCell(j,:) * (1.0_RFREAL - PhiP(:))
+         end do
+         ALLOCATE(varInfoPicl(9),STAT=errorFlag)
+         ALLOCATE(piclcvInfo(9),STAT=errorFlag)
+         varInfoPicl = [(j, j=1, 9)]
+         piclcvInfo = varInfoPicl
 !
-        CALL RFLU_ComputeGradCellsWrapper(pRegion,1,9,1,9,varInfoPicl, &   
-                                          pRegion%mixt%piclPhiRSG,&                
-                                          pRegion%mixt%piclgradPhiRSG)       
+         CALL RFLU_ComputeGradCellsWrapper(pRegion,1,9,1,9,varInfoPicl, &   
+                                           pRegion%mixt%piclPhiRSG,&                
+                                           pRegion%mixt%piclgradPhiRSG)       
                                                                            
-        CALL RFLU_WENOGradCellsXYZWrapper(pRegion,1,9, &                   
-                                          pRegion%mixt%piclgradPhiRSG)       
+         CALL RFLU_WENOGradCellsXYZWrapper(pRegion,1,9, &                   
+                                           pRegion%mixt%piclgradPhiRSG)       
                                                                            
-        CALL RFLU_LimitGradCellsSimple(pRegion,1,9,1,9, &                  
-                                       pRegion%mixt%piclPhiRSG,&                   
-                                       piclcvInfo,&                        
-                                       pRegion%mixt%piclgradPhiRSG)          
+         CALL RFLU_LimitGradCellsSimple(pRegion,1,9,1,9, &                  
+                                        pRegion%mixt%piclPhiRSG,&                   
+                                        piclcvInfo,&                        
+                                        pRegion%mixt%piclgradPhiRSG)          
 
-        DEALLOCATE(varInfoPicl,STAT=errorFlag)
-        DEALLOCATE(piclcvInfo,STAT=errorFlag)
+         DEALLOCATE(varInfoPicl,STAT=errorFlag)
+         DEALLOCATE(piclcvInfo,STAT=errorFlag)
 
-
-! x-direction: (\phi R_11),1 + (\phi R_12),2 + (\phi R_13),3
-! y-direction: (\phi R_21),1 + (\phi R_22),2 + (\phi R_23),3
-! z-direction: (\phi R_31),1 + (\phi R_32),2 + (\phi R_33),3
-        
 !       ! Now compute Div(\phi_g R_sg)
         ! 07/23/2025 - Thierry Daoud 
         ! pRegion%mixt%piclgradPhiRSG dimension is (3,9,nCellsTot)
         ! nCellsTot = no. actual cells (nCells) + no. dummy (ghost?) cells
-        ! Reason why I used nCellsTot and not nCells is because you get Invalid Quantity 
-        ! if calculting gradient on nCells only
-
-        DivPhiRSG(XCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,1,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(YCOORD,2,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(ZCOORD,3,1:nCells)
-
-        DivPhiRSG(YCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,4,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(YCOORD,5,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(ZCOORD,6,1:nCells)
-
-        DivPhiRSG(ZCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,7,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(YCOORD,8,1:nCells) &
-                            + pRegion%mixt%piclgradPhiRSG(ZCOORD,9,1:nCells)
+        ! When calculating the gradient, you need to use nCellsTot
         
-        ! Temporarily storing the values in an array for plotting and viewing in ParaView
-        ! I should probably delete that later
-        pRegion%mixt%piclDivPhiRSG(1,:) = DivPhiRSG(1,:)
-        pRegion%mixt%piclDivPhiRSG(2,:) = DivPhiRSG(2,:)
-        pRegion%mixt%piclDivPhiRSG(3,:) = DivPhiRSG(3,:)
+! Div (\phi_g R_sg) - comma denotes partial derivative (,3 -> partial / partial x_3)
+! x-direction: Div(\phi_g R_sg),x = (\phi R_11),1 + (\phi R_12),2 + (\phi R_13),3
+! y-direction: Div(\phi_g R_sg),y = (\phi R_21),1 + (\phi R_22),2 + (\phi R_23),3
+! z-direction: Div(\phi_g R_sg),z = (\phi R_31),1 + (\phi R_32),2 + (\phi R_33),3
 
+         DivPhiRSG(XCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,1,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(YCOORD,2,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(ZCOORD,3,1:nCells)
 
-       if(ANY(DivPhiRSG(1,:) .ne. 0.0d0) .and. pRegion%irkStep.eq.3) then
-        write(150,*) global%currentTime, DivPhiRSG(1,:)
-       endif
+         DivPhiRSG(YCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,4,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(YCOORD,5,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(ZCOORD,6,1:nCells)
 
-       if(ANY(DivPhiRSG(2,:) .ne. 0.0d0) .and. pRegion%irkStep.eq.3) then
-        write(151,*) global%currentTime, DivPhiRSG(2,:)
-       endif
+         DivPhiRSG(ZCOORD,:) = pRegion%mixt%piclgradPhiRSG(XCOORD,7,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(YCOORD,8,1:nCells) &
+                             + pRegion%mixt%piclgradPhiRSG(ZCOORD,9,1:nCells)
 
-       if(ANY(DivPhiRSG(3,:) .ne. 0.0d0) .and. pRegion%irkStep.eq.3) then
-        write(152,*) global%currentTime, DivPhiRSG(3,:)
-       endif
+         ! Temporarily storing the values in an array for plotting and viewing in ParaView
+         ! I should probably delete that later
+         pRegion%mixt%piclDivPhiRSG(1,:) = DivPhiRSG(1,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(2,:) = DivPhiRSG(2,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(3,:) = DivPhiRSG(3,:)*pregion%grid%vol(1:nCells)
+
+         ! Feedback Div(\phi RSG) to the Fluid Momentum Equations
+         pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells) &
+                          = pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells) &
+                          - DivPhiRSG(XCOORD,:)*pregion%grid%vol(1:nCells) 
+         
+         pRegion%mixt%rhs(CV_MIXT_YMOM,1:nCells) &
+                          = pRegion%mixt%rhs(CV_MIXT_YMOM,1:nCells) &
+                          - DivPhiRSG(YCOORD,:)*pregion%grid%vol(1:nCells) 
+
+         pRegion%mixt%rhs(CV_MIXT_ZMOM,1:nCells) &
+                          = pRegion%mixt%rhs(CV_MIXT_ZMOM,1:nCells) &
+                          - DivPhiRSG(ZCOORD,:)*pregion%grid%vol(1:nCells) 
+
+       endif ! piclPseudoTurbFlag
 !---------------------------------------------------------------------------------------
 
 END IF ! global%piclFeedbackFlag
@@ -1411,12 +1370,6 @@ end DO
     END IF ! global%error
 
     DEALLOCATE(JRSGCell,STAT=errorFlag)
-    global%error = errorFlag
-    IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')
-    END IF ! global%error
-
-    DEALLOCATE(PhiG,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
       CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')

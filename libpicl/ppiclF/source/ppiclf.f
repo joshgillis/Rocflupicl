@@ -387,6 +387,7 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
+         Rsg = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -716,10 +717,7 @@
             ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
             ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
             
-            if(iStage .eq. 3) then
-              write(71,*) ppiclf_time, i, ppiclf_rprop4(1,i)
-            endif
-         endif 
+         endif ! feedback_flag
 
 !
 ! Step 12: If stationary, don't move particles. Feedback can still be on
@@ -1964,7 +1962,6 @@
       real*8 eunit(3)
 
 !------------------------------------------------------------     
-      real*8 z
       real*8 F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11,
      >       G1, G2, G3, G4, G5, G6, G7, G8,              
      >       A1, A2, A3,                                   
@@ -1972,9 +1969,8 @@
      >       xi_par, xi_perp,                             
      >       R_par, R_perp                              
       real*8 cd
-      integer*4 m, n, c
-      save c               ! <- retains value between calls
-      data c /1/           ! <- initializes only once
+      real*8 phi, mp, re
+      integer*4 m, n
       real*8 R(3,3), Q(3,3), Qt(3,3) 
 !-------------------------------------------------------------
 
@@ -2176,9 +2172,15 @@
 
 !---------------------------------------------------------------------------
 ! Pseudo-Turbulence Calculations starts here 
-      ! if statement to check if flag is ON 
       if(pseudoTurb_flag==1) then
-  
+
+        ! Setting upper and lower bounds for 
+        ! rmachp, rphip, and rep otherwise R_perp is very high for out
+        ! of bounds values
+        phi = max(0.0d0, min(0.3d0, rphip))
+        mp  = max(0.0d0, min(0.87d0, rmachp))
+        re  = max(30.0d0, min(266.0d0, rep))
+        
         ! Constants taken from Osnes paper, Table 2 
         F1  = -0.0022                               
         F2  = -0.0219                               
@@ -2203,42 +2205,37 @@
         
         ! Lagrangian model
   
-        A1 = F1 / (rphip + F2)
+        A1 = F1 / (phi + F2)
   
         if(CD_prime .lt. 0.0) then               
-          A2 = F3 - 0.2 * F3 * min(0.2, rphip)   
+          A2 = F3 - 0.2 * F3 * min(0.2, phi)   
         elseif(CD_prime .ge. 0.0) then           
-          A2 = F4 + F5/(rphip + F6) + F7 * rmachp
+          A2 = F4 + F5/(phi + F6) + F7 * mp
         else                                     
-          print*, "CD_prime error", CD_prime     
+          print*, "If statement CD_prime error in QS-Fluct 
+     >    Subroutine , PseudoTurb calculation", CD_prime     
           stop                                   
         endif                                    
   
-        s_par = F8 + F9/(rphip + F10) + F11 * rmachp 
+        s_par = F8 + F9/(phi + F10) + F11 * mp
   
         call RANDOM_NUMBER(UnifRnd)
         
-        z = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+        Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
   
-        xi_par = s_par * z 
+        xi_par = s_par * Z1
   
         ! Reynolds Subgrid Stress - Parallel Component
         R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
   
-        !------
-        ! Finalize decision whether to set upper and lower bounds for 
-        ! rmachp, rphip, and rep based on data for outer bounds 
         
-        !Mach = max(0.3d0, min(0.8d0, Mach))
-        
-        A3 = G1 + G2/(rphip + G3) + G4 * rmachp
-        s_perp = G5/(rphip + G6) + (G7*rep)/(300.0*rphip) + G8 
+        A3 = G1 + G2/(phi + G3) + G4 * mp
+        s_perp = G5/(phi + G6) + (G7*re)/(300.0*phi) + G8 
   
-        xi_perp = s_perp * z
+        xi_perp = s_perp * Z1
        
         ! Reynolds Subgrid Stress - Perpendicular Component
         R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
-  
   
 c---  Q = [avec | bvec | cvec], 3x3 matrix
         do m=1,3
@@ -2249,13 +2246,13 @@ c---  Q = [avec | bvec | cvec], 3x3 matrix
   
         Qt = transpose(Q)
   
-c--- R = |R_par,   0   ,   0   |
-c---     | 0   , R_perp,   0   |
-c---     | 0       0   , R_perp|
-  
         ! zero out matrices at first
         R = 0.0d0
         Rsg = 0.0d0
+  
+c--- R = |R_par,   0   ,   0   |
+c---     | 0   , R_perp,   0   |
+c---     | 0       0   , R_perp|
   
 c---  R matrix only has diagonal components
         R(1,1) = R_par
@@ -2266,14 +2263,12 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
         Rsg = matmul(Q, matmul(R,Qt))
   
-  
-        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
-        write(100, *) ppiclf_time, i, rep, rphip, rmachp,
-     >                cd, CD_prime, fqs_fluct,
-     >                R_par, R_perp, Rsg(1,1)
-  
-          c = c + 1
-        endif
+!        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
+!        write(100, *) ppiclf_time, i, re, phi, mp,
+!     >                cd, CD_prime, fqs_fluct,
+!     >                R_par, R_perp, Rsg(1,1)
+!  
+!        endif
       
       endif ! pseudoTurb_flag
 
@@ -6676,10 +6671,6 @@ c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)
             idum = idum + 1
             ppiclf_cp_map(idum,ip) = map(j)
          enddo
-
-         write(72,*) ppiclf_time, ip, 
-     >               ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+11,ip),
-     >               ppiclf_rprop4(1,ip)
 
          rxval = ppiclf_cp_map(1,ip)
          ryval = ppiclf_cp_map(2,ip)
@@ -13415,14 +13406,6 @@ c----------------------------------------------------------------------
             rproj(ic,ip) = ppiclf_cp_map(j,ip)*multfci
          ENDdo
 
-         write(90,*) ppiclf_time,
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+2,ip), ! JFX
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+3,ip), ! JFY
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+4,ip) ! JFZ
-
-         write(70,*) ppiclf_time, ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP
-     >    +11,ip), rproj(15,ip)
-                    
          iproj(1,ip)  = ppiclf_iprop(8,ip)
          iproj(2,ip)  = ppiclf_iprop(9,ip)
          if (if3d)
@@ -13665,7 +13648,6 @@ c----------------------------------------------------------------------
             END if ! if3d
 
              rexp = 1.0 / evol
-             print*, "evol =", evol
            do k=1,PPICLF_LEZ
            do j=1,PPICLF_LEY
            do i=1,PPICLF_LEX

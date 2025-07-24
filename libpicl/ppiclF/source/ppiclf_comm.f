@@ -1213,10 +1213,6 @@ c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)
             ppiclf_cp_map(idum,ip) = map(j)
          enddo
 
-         write(72,*) ppiclf_time, ip, 
-     >               ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+11,ip),
-     >               ppiclf_rprop4(1,ip)
-
          rxval = ppiclf_cp_map(1,ip)
          ryval = ppiclf_cp_map(2,ip)
          rzval = 0.0d0

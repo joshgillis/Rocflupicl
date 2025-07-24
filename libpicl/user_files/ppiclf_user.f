@@ -385,6 +385,7 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
+         Rsg = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -714,10 +715,7 @@
             ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
             ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
             
-            if(iStage .eq. 3) then
-              write(71,*) ppiclf_time, i, ppiclf_rprop4(1,i)
-            endif
-         endif 
+         endif ! feedback_flag
 
 !
 ! Step 12: If stationary, don't move particles. Feedback can still be on

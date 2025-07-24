@@ -173,6 +173,7 @@ MODULE ModMixture
     REAL(RFREAL), DIMENSION(:,:), POINTER :: piclPhiRSG
     REAL(RFREAL), DIMENSION(:,:,:), POINTER :: piclgradPhiRSG
     REAL(RFREAL), DIMENSION(:,:), POINTER :: piclDivPhiRSG
+    REAL(RFREAL), DIMENSION(:,:), POINTER :: piclJF
     ! 03/19/2025 - Thierry - ends here
     ! 04/01/2025 - TLJ - adding feedback and its gradient
     REAL(RFREAL), DIMENSION(:,:), POINTER :: piclFeedback

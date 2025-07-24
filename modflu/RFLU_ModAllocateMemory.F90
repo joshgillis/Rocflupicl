@@ -520,6 +520,7 @@ SUBROUTINE RFLU_AllocateMemorySolCv(pRegion)
      ALLOCATE(pRegion%mixt%piclPhiRSG(9,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclgradPhiRSG(3,9,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclDivPhiRSG(3,pGrid%nCells),STAT=errorFlag)
+     ALLOCATE(pRegion%mixt%piclJF(3,pGrid%nCells),STAT=errorFlag)
      global%error = errorFlag
      IF (global%error /= ERR_NONE) THEN
         CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'pRegion%mixt%piclfVF')

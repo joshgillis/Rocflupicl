@@ -163,7 +163,11 @@ SUBROUTINE RFLU_TimeStepping(dTimeSystem,dIterSystem,regions)
 
 ! rprop: 64
 
-! map: 10
+! rprop4: PPICLF_LRP4
+
+! map: 19
+!--- Reynolds Subgrid Stress Tensor
+
 
 
 
@@ -483,7 +487,7 @@ SUBROUTINE RFLU_TimeStepping(dTimeSystem,dIterSystem,regions)
     END IF ! solverType
 
     ! TLJ - Use below to set for a fixed dt
-    !!global%dtMin = 1.d-6
+    !global%dtMin = 4.d-8
     ! TLJ: Set dt fixed for unit test problems
     if (global%piclStationaryFlag<0) global%dtMin = 5.d-8
 

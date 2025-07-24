@@ -3130,14 +3130,6 @@ c----------------------------------------------------------------------
             rproj(ic,ip) = ppiclf_cp_map(j,ip)*multfci
          ENDdo
 
-         write(90,*) ppiclf_time,
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+2,ip), ! JFX
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+3,ip), ! JFY
-     >          ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP+4,ip) ! JFZ
-
-         write(70,*) ppiclf_time, ppiclf_cp_map(PPICLF_LRS+PPICLF_LRP
-     >    +11,ip), rproj(15,ip)
-                    
          iproj(1,ip)  = ppiclf_iprop(8,ip)
          iproj(2,ip)  = ppiclf_iprop(9,ip)
          if (if3d)
@@ -3380,7 +3372,6 @@ c----------------------------------------------------------------------
             END if ! if3d
 
              rexp = 1.0 / evol
-             print*, "evol =", evol
            do k=1,PPICLF_LEZ
            do j=1,PPICLF_LEY
            do i=1,PPICLF_LEX
