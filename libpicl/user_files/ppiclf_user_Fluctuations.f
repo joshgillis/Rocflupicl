@@ -37,21 +37,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -215,22 +200,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -247,18 +216,13 @@
       real*8 cosrand,sinrand
       real*8 eunit(3)
 
-!------------------------------------------------------------     
-      real*8 F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11,
-     >       G1, G2, G3, G4, G5, G6, G7, G8,              
-     >       A1, A2, A3,                                   
-     >       s_par, s_perp,                               
+      real*8 s_par, s_perp,                               
      >       xi_par, xi_perp,                             
      >       R_par, R_perp                              
       real*8 cd
-      real*8 phi, mp, re
       integer*4 m, n
       real*8 R(3,3), Q(3,3), Qt(3,3) 
-!-------------------------------------------------------------
+      real*8 R_par_plot, R_perp_plot
 
 !
 ! Code:
@@ -418,6 +382,11 @@
       denum   = max(1.d-8,sqrt(dvec(1)**2 + dvec(2)**2 + dvec(3)**2))
       dvec    = dvec/denum
 
+      ! Store and project back fqs_fluct values only if QSFLUCT = 2
+      ! Otherwise, need to call subroutine for PseudoTurbulence
+      if(qs_fluct_flag .eq. 0) then
+        fqs_fluct = 0.0d0
+      else
       fqs_fluct(1) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFX,i)
      >           + bSDE_CD*dW1*avec(1) + bSDE_CL*dW2*dvec(1)
@@ -427,7 +396,7 @@
       fqs_fluct(3) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFZ,i)
      >           + bSDE_CD*dW1*avec(3) + bSDE_CL*dW2*dvec(3)
-
+      endif
 
       if (ppiclf_debug==2 .and. (iStage==1 .and. ppiclf_nid==0)) then
          if (ppiclf_time.gt.2.d-8) then
@@ -463,65 +432,75 @@
         ! Setting upper and lower bounds for 
         ! rmachp, rphip, and rep otherwise R_perp is very high for out
         ! of bounds values
-        phi = max(0.0d0, min(0.3d0, rphip))
+
+        ! not sure if I should take phi range of Mehrabadi or Osnes yet
+        phi = max(0.1d0, min(0.3d0, rphip))
         mp  = max(0.0d0, min(0.87d0, rmachp))
         re  = max(30.0d0, min(266.0d0, rep))
-        
-        ! Constants taken from Osnes paper, Table 2 
-        F1  = -0.0022                               
-        F2  = -0.0219                               
-        F3  =  0.0932
-        F4  = -0.0135
-        F5  =  0.0361
-        F6  =  0.0403
-        F7  = -0.0761
-        F8  =  0.0599 
-        F9  =  0.0164 
-        F10 =  0.0453 
-        F11 = -0.0265 
+          
+c------ ! Lagrangian Model
   
-        G1  = -0.2867
-        G2  =  0.2176
-        G3  =  0.2826
-        G4  = -0.0644
-        G5  =  0.0466
-        G6  =  0.0973
-        G7  = -0.0081
-        G8  = -0.0235
-        
-        ! Lagrangian model
-  
-        A1 = F1 / (phi + F2)
+        A1P = F1P / (phi + F2P)
   
         if(CD_prime .lt. 0.0) then               
-          A2 = F3 - 0.2 * F3 * min(0.2, phi)   
+          A2P = F3P - 0.2 * F3P / min(0.2, phi)   
         elseif(CD_prime .ge. 0.0) then           
-          A2 = F4 + F5/(phi + F6) + F7 * mp
+          A2P = F4P + F5P/(phi + F6P) + F7P * mp
         else                                     
           print*, "If statement CD_prime error in QS-Fluct 
      >    Subroutine , PseudoTurb calculation", CD_prime     
           stop                                   
         endif                                    
   
-        s_par = F8 + F9/(phi + F10) + F11 * mp
+        s_par = F8P + F9P/(phi + F10P) + F11P * mp
   
         call RANDOM_NUMBER(UnifRnd)
         
         Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+        Z2 = sqrt(-2.0d0*log(UnifRnd(1))) * sin(TwoPi*UnifRnd(2))
+
+        ! sanity check 
+        if (UnifRnd(1) < 1.0d-10) then
+          print*, "UnifRnd(1) !!!!!", UnifRnd(1)
+          UnifRnd(1) = 1.0d-10
+        endif
+
+        if (UnifRnd(2) < 1.0d-10) then
+          print*, "UnifRnd(2) !!!!!", UnifRnd(2)
+          UnifRnd(2) = 1.0d-10
+        endif
   
         xi_par = s_par * Z1
+
+        ! Normalize Mean Data
+        cd_average = cd_average / denum
+        Rmean_par = Rmean_par / denum
+        Rmean_perp = Rmean_perp / denum
   
-        ! Reynolds Subgrid Stress - Parallel Component
-        R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
+        ! Lagrangian Reynolds Subgrid Stress - Parallel Component
+        R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par
   
         
-        A3 = G1 + G2/(phi + G3) + G4 * mp
-        s_perp = G5/(phi + G6) + (G7*re)/(300.0*phi) + G8 
+        A3P = G1P + G2P/(phi + G3P) + G4P * mp
+        s_perp = G5P/(phi + G6P) + (G7P*re)/(300.0*phi) + G8P
   
-        xi_perp = s_perp * Z1
+        xi_perp = s_perp * Z2
        
-        ! Reynolds Subgrid Stress - Perpendicular Component
-        R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
+        ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
+        R_perp = 1.0 + A3P * CD_prime / cd_average + xi_perp
+
+c--  Multiply Lagrangian Model by the Eulerian Mean Model
+      
+        ! Checking if normalization is the issue
+!        Rmean_par = 1.0d0 + A1P
+!        Rmean_perp = 1.0d0
+!-----------------------------
+        R_par  = R_par  * Rmean_par 
+        R_perp = R_perp * Rmean_perp
+
+        ! This is what Osnes plots
+        R_par_plot = A1P + A2P * CD_prime / cd_average + xi_par
+        R_perp_plot = A3P * CD_prime / cd_average + xi_perp
   
 c---  Q = [avec | bvec | cvec], 3x3 matrix
         do m=1,3
@@ -548,13 +527,25 @@ c---  R matrix only has diagonal components
 c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
         Rsg = matmul(Q, matmul(R,Qt))
-  
-!        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
-!        write(100, *) ppiclf_time, i, re, phi, mp,
-!     >                cd, CD_prime, fqs_fluct,
-!     >                R_par, R_perp, Rsg(1,1)
-!  
-!        endif
+
+
+!c--- trying an anaylyitcal function to validate the gradient
+!        Rsg = 0.0d0
+!        Rsg(1,1) = 1.0d0
+!
+!        Rsg(2,2) = 1.0d0
+!
+!        Rsg(3,3) = Rsg(2,2) 
+!c----- 
+
+        if(iStage.eq.3) then
+        write(100, *) ppiclf_time, i, re, phi, mp, ! 0-4
+     >                cd_average, CD_prime, fqs_fluct,     ! 5-9
+     >                R_par, R_perp,               ! 10-11
+     >                Rmean_par, Rmean_perp,       ! 12-13
+     >                R_par_plot, R_perp_plot      ! 14-15
+
+        endif
       
       endif ! pseudoTurb_flag
 

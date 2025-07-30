@@ -45,22 +45,7 @@
       include "PPICLF"
 !
 ! Internal:
-!
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
+!      
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -85,7 +70,6 @@
       real*8 factor, rcp_fluid, rmass_add
 
       real*8 gkern
-  
 !-----------------------------------------------------------------------
       ! Thierry - 06/27/204 - added mass variables declaration
       integer*4 j, l
@@ -387,7 +371,10 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-         Rsg = 0.0d0
+         !--- Added for PseudoTurbulence
+         k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
+         Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
+         cd_average = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -411,7 +398,8 @@
 ! Step 1b: Call NearestNeighbor if particles i and j interact
 !
          if ((am_flag==2).or.(collisional_flag>=1)
-     >          .or.(qs_fluct_flag>=1)) then
+     >          .or.(qs_fluct_flag>=1)
+     >          .or.(pseudoTurb_flag==1)) then
 
          if ((qs_fluct_flag>=1) .and. (vmag .gt. 1.d-8)) then
             ! Compute mean for particle i
@@ -455,8 +443,56 @@
                w2pmean  = gkern*(ppiclf_y(PPICLF_JVZ,i)**2)*
      >                    ppiclf_rprop(PPICLF_R_JVOLP,i)
                icpmean = 1
-            end if
-         end if
+            end if 
+         end if ! qs_fluct_flag .and. vmag
+
+         ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
+         if(pseudoTurb_flag==1) then
+
+           icpmean  = 1 ! used to normalize later
+
+           ! capping values to bounds provided by Osnes
+! Trying to replicate Osnes's data           
+           !rphip   = 0.2d0
+           !rmachp  = 0.67d0
+           !rep     = 71.0d0
+!========================
+           ! phi, rem ranges are taken from Mehrabadi et al. 
+           phi = max(0.1d0, min(0.3d0, rphip))  
+           mp  = max(0.0d0, min(0.87d0, rmachp))
+           re  = max(30.0d0, min(266.0d0, rep))
+           rem = (1.0-phi)*re 
+           rem = max(0.01d0, min(300.0d0, rem))
+
+                                                                       
+        ! Reynolds number and vol fraction dependent k^tilde and b_par 
+           k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
+     >            exp(-phi*(rem**0.5))                                 
+                                                                       
+           b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+     >             exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
+                                                                       
+        ! Mach number corrections                                      
+           k_Mach = phi*(C1P + C2P*phi + re**C3P) * 
+     >           (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
+           b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
+     >            phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
+     >            (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
+                                                                       
+        ! Corrected k^tilde and b_par components                       
+           k_tilde = k_tilde*(1.0d0 + k_Mach)
+           b_par  = b_par*(1.0d0 + b_Mach)
+           b_perp = -b_par/2.0d0
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
+           Rmean_par  = 2.0d0*k_tilde*(b_par  + 1.0d0/3.0d0)
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
+           Rmean_perp = 2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
+
+           cd_average = cd_average + cd
+
+         endif ! pseudoTurb_flag
 
          ! add neighbors
          IF ( sbNearest_flag .EQ. 1) THEN
@@ -755,7 +791,9 @@
 !
 ! Step 13: Store forces
 !
-         ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
+         !ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
+         ! Thierry - just testing this for now to see if it makes a difference in R_perp
+         ppiclf_rprop(PPICLF_R_FQSX,i)  = cd 
          ppiclf_rprop(PPICLF_R_FQSY,i)  = fqsy
          ppiclf_rprop(PPICLF_R_FQSZ,i)  = fqsz
          ppiclf_rprop(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
@@ -1157,22 +1195,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i, iStage
       real*8 famx, famy, famz
 !
@@ -1344,24 +1366,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr
 
@@ -1467,24 +1473,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr,
      >   b1,b2,b3
@@ -1603,24 +1593,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re,Knp,fKn,CD1,s,JM,CD2,
+      real*8 gamma,Knp,fKn,CD1,s,JM,CD2,
      >   cd_loth,CM,GM,HM,b1,b2,b3,cd,beta
       real*8 sgby2, JMt
 
@@ -1751,21 +1725,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -1929,22 +1888,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -1961,18 +1904,13 @@
       real*8 cosrand,sinrand
       real*8 eunit(3)
 
-!------------------------------------------------------------     
-      real*8 F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11,
-     >       G1, G2, G3, G4, G5, G6, G7, G8,              
-     >       A1, A2, A3,                                   
-     >       s_par, s_perp,                               
+      real*8 s_par, s_perp,                               
      >       xi_par, xi_perp,                             
      >       R_par, R_perp                              
       real*8 cd
-      real*8 phi, mp, re
       integer*4 m, n
       real*8 R(3,3), Q(3,3), Qt(3,3) 
-!-------------------------------------------------------------
+      real*8 R_par_plot, R_perp_plot
 
 !
 ! Code:
@@ -2132,6 +2070,11 @@
       denum   = max(1.d-8,sqrt(dvec(1)**2 + dvec(2)**2 + dvec(3)**2))
       dvec    = dvec/denum
 
+      ! Store and project back fqs_fluct values only if QSFLUCT = 2
+      ! Otherwise, need to call subroutine for PseudoTurbulence
+      if(qs_fluct_flag .eq. 0) then
+        fqs_fluct = 0.0d0
+      else
       fqs_fluct(1) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFX,i)
      >           + bSDE_CD*dW1*avec(1) + bSDE_CL*dW2*dvec(1)
@@ -2141,7 +2084,7 @@
       fqs_fluct(3) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFZ,i)
      >           + bSDE_CD*dW1*avec(3) + bSDE_CL*dW2*dvec(3)
-
+      endif
 
       if (ppiclf_debug==2 .and. (iStage==1 .and. ppiclf_nid==0)) then
          if (ppiclf_time.gt.2.d-8) then
@@ -2177,65 +2120,75 @@
         ! Setting upper and lower bounds for 
         ! rmachp, rphip, and rep otherwise R_perp is very high for out
         ! of bounds values
-        phi = max(0.0d0, min(0.3d0, rphip))
+
+        ! not sure if I should take phi range of Mehrabadi or Osnes yet
+        phi = max(0.1d0, min(0.3d0, rphip))
         mp  = max(0.0d0, min(0.87d0, rmachp))
         re  = max(30.0d0, min(266.0d0, rep))
-        
-        ! Constants taken from Osnes paper, Table 2 
-        F1  = -0.0022                               
-        F2  = -0.0219                               
-        F3  =  0.0932
-        F4  = -0.0135
-        F5  =  0.0361
-        F6  =  0.0403
-        F7  = -0.0761
-        F8  =  0.0599 
-        F9  =  0.0164 
-        F10 =  0.0453 
-        F11 = -0.0265 
+          
+c------ ! Lagrangian Model
   
-        G1  = -0.2867
-        G2  =  0.2176
-        G3  =  0.2826
-        G4  = -0.0644
-        G5  =  0.0466
-        G6  =  0.0973
-        G7  = -0.0081
-        G8  = -0.0235
-        
-        ! Lagrangian model
-  
-        A1 = F1 / (phi + F2)
+        A1P = F1P / (phi + F2P)
   
         if(CD_prime .lt. 0.0) then               
-          A2 = F3 - 0.2 * F3 * min(0.2, phi)   
+          A2P = F3P - 0.2 * F3P / min(0.2, phi)   
         elseif(CD_prime .ge. 0.0) then           
-          A2 = F4 + F5/(phi + F6) + F7 * mp
+          A2P = F4P + F5P/(phi + F6P) + F7P * mp
         else                                     
           print*, "If statement CD_prime error in QS-Fluct 
      >    Subroutine , PseudoTurb calculation", CD_prime     
           stop                                   
         endif                                    
   
-        s_par = F8 + F9/(phi + F10) + F11 * mp
+        s_par = F8P + F9P/(phi + F10P) + F11P * mp
   
         call RANDOM_NUMBER(UnifRnd)
         
         Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+        Z2 = sqrt(-2.0d0*log(UnifRnd(1))) * sin(TwoPi*UnifRnd(2))
+
+        ! sanity check 
+        if (UnifRnd(1) < 1.0d-10) then
+          print*, "UnifRnd(1) !!!!!", UnifRnd(1)
+          UnifRnd(1) = 1.0d-10
+        endif
+
+        if (UnifRnd(2) < 1.0d-10) then
+          print*, "UnifRnd(2) !!!!!", UnifRnd(2)
+          UnifRnd(2) = 1.0d-10
+        endif
   
         xi_par = s_par * Z1
+
+        ! Normalize Mean Data
+        cd_average = cd_average / denum
+        Rmean_par = Rmean_par / denum
+        Rmean_perp = Rmean_perp / denum
   
-        ! Reynolds Subgrid Stress - Parallel Component
-        R_par = 1.0 + A1 + A2 * CD_prime / cd + xi_par
+        ! Lagrangian Reynolds Subgrid Stress - Parallel Component
+        R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par
   
         
-        A3 = G1 + G2/(phi + G3) + G4 * mp
-        s_perp = G5/(phi + G6) + (G7*re)/(300.0*phi) + G8 
+        A3P = G1P + G2P/(phi + G3P) + G4P * mp
+        s_perp = G5P/(phi + G6P) + (G7P*re)/(300.0*phi) + G8P
   
-        xi_perp = s_perp * Z1
+        xi_perp = s_perp * Z2
        
-        ! Reynolds Subgrid Stress - Perpendicular Component
-        R_perp = 1.0 + A3 * CD_prime / cd + xi_perp
+        ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
+        R_perp = 1.0 + A3P * CD_prime / cd_average + xi_perp
+
+c--  Multiply Lagrangian Model by the Eulerian Mean Model
+      
+        ! Checking if normalization is the issue
+!        Rmean_par = 1.0d0 + A1P
+!        Rmean_perp = 1.0d0
+!-----------------------------
+        R_par  = R_par  * Rmean_par 
+        R_perp = R_perp * Rmean_perp
+
+        ! This is what Osnes plots
+        R_par_plot = A1P + A2P * CD_prime / cd_average + xi_par
+        R_perp_plot = A3P * CD_prime / cd_average + xi_perp
   
 c---  Q = [avec | bvec | cvec], 3x3 matrix
         do m=1,3
@@ -2262,13 +2215,25 @@ c---  R matrix only has diagonal components
 c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
         Rsg = matmul(Q, matmul(R,Qt))
-  
-!        if(Rsg(1,1) .ne. 0.0 .and. iStage.eq.3) then
-!        write(100, *) ppiclf_time, i, re, phi, mp,
-!     >                cd, CD_prime, fqs_fluct,
-!     >                R_par, R_perp, Rsg(1,1)
-!  
-!        endif
+
+
+!c--- trying an anaylyitcal function to validate the gradient
+!        Rsg = 0.0d0
+!        Rsg(1,1) = 1.0d0
+!
+!        Rsg(2,2) = 1.0d0
+!
+!        Rsg(3,3) = Rsg(2,2) 
+!c----- 
+
+        if(iStage.eq.3) then
+        write(100, *) ppiclf_time, i, re, phi, mp, ! 0-4
+     >                cd_average, CD_prime, fqs_fluct,     ! 5-9
+     >                R_par, R_perp,               ! 10-11
+     >                Rmean_par, Rmean_perp,       ! 12-13
+     >                R_par_plot, R_perp_plot      ! 14-15
+
+        endif
       
       endif ! pseudoTurb_flag
 
@@ -2298,21 +2263,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage
       real*8 famx, famy, famz, rmass_add
       real*8 rcd_am
@@ -2454,21 +2404,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer i, j, k, l, n, jj
       integer*4 iStage
       real*8 rad
@@ -2595,21 +2530,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer i, j, k, l, n, jj
       integer*4 iStage
       real*8 rad
@@ -3381,22 +3301,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i
       real*8 qq, Nuss, Q_conv
 
@@ -3625,22 +3529,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i,iStage
       real*8 taux, tauy, tauz
       real*8 taux_hydro, tauy_hydro, tauz_hydro
@@ -3817,22 +3705,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i,iStage
       real*8 liftx, lifty, liftz
 
@@ -4006,21 +3878,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, iStage, iT
       real*8 fvux,fvuy,fvuz
       real*8 time,fH,factor,A,B,kernelVU
@@ -4104,21 +3961,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, iT
 
 !
@@ -4249,21 +4091,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i,k,ic,iT
 !
 ! Code:
@@ -4309,21 +4136,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i,k,ic,iT
 !
 ! Code:
@@ -4377,22 +4189,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Input:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-
       integer*4 i
       integer*4 j
       real*8 yi    (PPICLF_LRS)    
@@ -4439,6 +4235,8 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
       real*8 E1, E2, Estar
       real*8 r1, r2, Rstar 
       real*8 ksp1, ksp2, ksp_min
+      ! Thierry - for PseudoTurbulence
+      real*8 vmagj, asndfj, rhofj, dpj, phij, rej, mpj
 
 !
 ! Code:
@@ -4715,7 +4513,8 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
          ! The mean is calcuated according to Lattanzi etal,
          !   Physical Review Fluids, 2022.
          !
-         if (j.ne.0) then
+         !if (j.ne.0) then ! I don't think that's needed, we're double
+         !    checking 
          if (qs_fluct_filter_flag==0) then
             upmean   = upmean + yj(PPICLF_JVX)
             vpmean   = vpmean + yj(PPICLF_JVY)
@@ -4746,7 +4545,60 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
      >                gkern*(yj(PPICLF_JVZ)**2)*rpropj(PPICLF_R_JVOLP)
             icpmean = icpmean + 1
          end if
-         end if
+
+         if(pseudoTurb_flag==1) then
+!--- get mp, re, and phip for the neighbors. 
+!--- rmu is used for the particle for the sake of simplicity for now
+
+           vmagj  = sqrt(yj(PPICLF_JVX)**2 + yj(PPICLF_JVY)**2 
+     >                 + yj(PPICLF_JVZ)**2)
+           asndfj = rpropj(PPICLF_R_JCS)
+           mpj     = vmagj/asndfj
+           rhofj  = rpropj(PPICLF_R_JRHOF)
+           dpj    = rpropj(PPICLF_R_JDP)
+
+           rej     = vmagj*dpj*rhofj/rmu
+
+           phij    = rpropj(PPICLF_R_JPHIP)
+
+           ! phi, rem ranges are taken from Mehrabadi et al. 
+           phi = max(0.1d0, min(0.3d0, phij))
+           mp  = max(0.0d0, min(0.87d0, mpj))
+           re  = max(30.0d0, min(266.0d0, rej))
+           rem = (1.0-phi)*re 
+           rem = max(0.01d0, min(300.0d0, rem))
+
+
+        ! Reynolds number and vol fraction dependent k^tilde and b_par 
+           k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) *
+     >            exp(-phi*(rem**0.5))
+
+           b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+     >             exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
+             
+        ! Mach number corrections                                      
+           k_Mach = phi*(C1P + C2P*phi + re**C3P) *
+     >           (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
+           b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
+     >            phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
+     >            (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
+
+        ! Corrected k^tilde and b_par components                       
+           k_tilde = k_tilde*(1.0d0 + k_Mach)
+           b_par  = b_par*(1.0d0 + b_Mach)
+           b_perp = -b_par/2.0d0
+
+        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
+           Rmean_par  = Rmean_par + 2.0d0*k_tilde*(b_par  + 1.0d0/3.0d0)
+
+        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
+           Rmean_perp = Rmean_perp +2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
+
+           cd_average = cd_average + rpropj(PPICLF_R_FQSX)
+         endif ! pseudoTurb_flag
+
+
+         !end if
 
 
 !-----------------------------------------------------------------------
@@ -4904,21 +4756,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i,j,k
 
 !
@@ -4951,21 +4788,6 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
       integer*4 i, n, ic, k, iStage
 
 ! Needed for allreduce

@@ -106,10 +106,13 @@
 
 ! map: PPICLF_LRP_PRO
 #define PPICLF_P_JPHIP 1
+!--- x,y,z Forces to Rocflu
 #define PPICLF_P_JFX 2
 #define PPICLF_P_JFY 3
 #define PPICLF_P_JFZ 4
+!---
 #define PPICLF_P_JE 5
+!--- Add comment about these terms 
 #define PPICLF_P_JPHIPD 6
 #define PPICLF_P_JPHIPU 7
 #define PPICLF_P_JPHIPV 8

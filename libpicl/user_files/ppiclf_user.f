@@ -43,22 +43,7 @@
       include "PPICLF"
 !
 ! Internal:
-!
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model, pseudoTurb_flag
+!      
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -83,7 +68,6 @@
       real*8 factor, rcp_fluid, rmass_add
 
       real*8 gkern
-  
 !-----------------------------------------------------------------------
       ! Thierry - 06/27/204 - added mass variables declaration
       integer*4 j, l
@@ -385,7 +369,10 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-         Rsg = 0.0d0
+         !--- Added for PseudoTurbulence
+         k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
+         Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
+         cd_average = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -409,7 +396,8 @@
 ! Step 1b: Call NearestNeighbor if particles i and j interact
 !
          if ((am_flag==2).or.(collisional_flag>=1)
-     >          .or.(qs_fluct_flag>=1)) then
+     >          .or.(qs_fluct_flag>=1)
+     >          .or.(pseudoTurb_flag==1)) then
 
          if ((qs_fluct_flag>=1) .and. (vmag .gt. 1.d-8)) then
             ! Compute mean for particle i
@@ -453,8 +441,56 @@
                w2pmean  = gkern*(ppiclf_y(PPICLF_JVZ,i)**2)*
      >                    ppiclf_rprop(PPICLF_R_JVOLP,i)
                icpmean = 1
-            end if
-         end if
+            end if 
+         end if ! qs_fluct_flag .and. vmag
+
+         ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
+         if(pseudoTurb_flag==1) then
+
+           icpmean  = 1 ! used to normalize later
+
+           ! capping values to bounds provided by Osnes
+! Trying to replicate Osnes's data           
+           !rphip   = 0.2d0
+           !rmachp  = 0.67d0
+           !rep     = 71.0d0
+!========================
+           ! phi, rem ranges are taken from Mehrabadi et al. 
+           phi = max(0.1d0, min(0.3d0, rphip))  
+           mp  = max(0.0d0, min(0.87d0, rmachp))
+           re  = max(30.0d0, min(266.0d0, rep))
+           rem = (1.0-phi)*re 
+           rem = max(0.01d0, min(300.0d0, rem))
+
+                                                                       
+        ! Reynolds number and vol fraction dependent k^tilde and b_par 
+           k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
+     >            exp(-phi*(rem**0.5))                                 
+                                                                       
+           b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+     >             exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
+                                                                       
+        ! Mach number corrections                                      
+           k_Mach = phi*(C1P + C2P*phi + re**C3P) * 
+     >           (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
+           b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
+     >            phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
+     >            (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
+                                                                       
+        ! Corrected k^tilde and b_par components                       
+           k_tilde = k_tilde*(1.0d0 + k_Mach)
+           b_par  = b_par*(1.0d0 + b_Mach)
+           b_perp = -b_par/2.0d0
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
+           Rmean_par  = 2.0d0*k_tilde*(b_par  + 1.0d0/3.0d0)
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
+           Rmean_perp = 2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
+
+           cd_average = cd_average + cd
+
+         endif ! pseudoTurb_flag
 
          ! add neighbors
          IF ( sbNearest_flag .EQ. 1) THEN
@@ -753,7 +789,9 @@
 !
 ! Step 13: Store forces
 !
-         ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
+         !ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
+         ! Thierry - just testing this for now to see if it makes a difference in R_perp
+         ppiclf_rprop(PPICLF_R_FQSX,i)  = cd 
          ppiclf_rprop(PPICLF_R_FQSY,i)  = fqsy
          ppiclf_rprop(PPICLF_R_FQSZ,i)  = fqsz
          ppiclf_rprop(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)

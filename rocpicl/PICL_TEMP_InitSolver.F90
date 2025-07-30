@@ -225,13 +225,6 @@ erest = global%piclERest
 qs_fluct_filter_flag = global%piclQsFluctFilterFlag
 qs_fluct_filter_adapt_flag = global%piclQsFluctFilterAdaptFlag
 
-! Sanity check if Pseudo-Turbulence is ON but QS-Fluct is OFF
-if((qs_fluct_flag .eq. 0) .and. (pseudoTurb_flag .eq. 1)) then
-  qs_fluct_flag = 2
-  IF(global%myProcID.eq.MASTERPROC) print*, "*** WARNING *** Overwriting &
-    PICL QSFLUCT flag from 0 to 2 since PSEUDOTURB is 1"
-endif
-
 ! 08/13/24 - Thierry - added for Periodicity - begins here
 ! 04/04/2025 - TLJ - modified to detemine min/max from Rocflu grid
 
