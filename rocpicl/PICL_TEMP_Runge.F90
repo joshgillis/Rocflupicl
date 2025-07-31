@@ -805,7 +805,7 @@ pGc => pRegion%mixt%gradCell
 
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JRHOF,rhoF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUX,uxF)
-      CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUY,uxF)
+      CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUY,uyF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JUZ,uzF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JDPDX,dpxF)
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JDPDY,dpyF)  
@@ -922,6 +922,8 @@ IF (IsNan(JFXCell(i)) .EQV. .TRUE.) THEN
         write(*,*) "JFY",i,JFYCell(i)
         write(*,*) "JFZ",i,JFZCell(i)
         write(*,*) "pregionvol", pregion%grid%vol(i)
+        write(*,*) "JRSGCell", i, JRSGCell(:,i)
+        write(*,*) "DivPhiRSG",i, DivPhiRSG(:,i)
         CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken PX')
 endif
 IF (IsNan(JFYCell(i)) .EQV. .TRUE.) THEN
@@ -972,8 +974,8 @@ endif
          pRegion%mixt%piclJF(3,:) = JFZCell(:)
 
        if(global%piclPseudoTurbFlag .eq. 1) then
-         ! \phi_g R_sg
          do j = 1, 9
+           ! \phi_g R_sg
            pRegion%mixt%piclPhiRSG(j,:) = JRSGCell(j,:) * (1.0_RFREAL - PhiP(:))
          end do
          ALLOCATE(varInfoPicl(9),STAT=errorFlag)
@@ -1021,9 +1023,9 @@ endif
 
          ! Temporarily storing the values in an array for plotting and viewing in ParaView
          ! I should probably delete that later
-         pRegion%mixt%piclDivPhiRSG(1,:) = DivPhiRSG(1,:)*pregion%grid%vol(1:nCells)
-         pRegion%mixt%piclDivPhiRSG(2,:) = DivPhiRSG(2,:)*pregion%grid%vol(1:nCells)
-         pRegion%mixt%piclDivPhiRSG(3,:) = DivPhiRSG(3,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(1,:) = -DivPhiRSG(1,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(2,:) = -DivPhiRSG(2,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(3,:) = -DivPhiRSG(3,:)*pregion%grid%vol(1:nCells)
 
          ! Feedback Div(\phi RSG) to the Fluid Momentum Equations
          pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells) &

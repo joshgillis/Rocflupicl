@@ -433,7 +433,7 @@
         ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
            Rmean_perp = Rmean_perp +2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
 
-           cd_average = cd_average + rpropj(PPICLF_R_FQSX)
+           cd_average = cd_average + rpropj(PPICLF_R_JCD)
          endif ! pseudoTurb_flag
 
 

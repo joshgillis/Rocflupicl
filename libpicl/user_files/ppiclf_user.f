@@ -68,11 +68,10 @@
       real*8 factor, rcp_fluid, rmass_add
 
       real*8 gkern
-!-----------------------------------------------------------------------
-      ! Thierry - 06/27/204 - added mass variables declaration
+
+! Needed for Added mass calculation
       integer*4 j, l
       real*8 SDrho
-!-----------------------------------------------------------------------
 
       real*8 vgradrhog
       integer*4 i, n, ic, k
@@ -372,7 +371,7 @@
          !--- Added for PseudoTurbulence
          k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
          Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
-         cd_average = 0.0d0
+         cd_average = 0.0d0; cd = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -461,6 +460,7 @@
            re  = max(30.0d0, min(266.0d0, rep))
            rem = (1.0-phi)*re 
            rem = max(0.01d0, min(300.0d0, rem))
+           
 
                                                                        
         ! Reynolds number and vol fraction dependent k^tilde and b_par 
@@ -488,7 +488,8 @@
         ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
            Rmean_perp = 2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
 
-           cd_average = cd_average + cd
+        ! Add the particle's drag coefficient of previous RK step
+           cd_average = cd_average + ppiclf_rprop(PPICLF_R_JCD,i)
 
          endif ! pseudoTurb_flag
 
@@ -505,12 +506,23 @@
 !
 ! Step 2: Force component quasi-steady
 !
+
          if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
          if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
          if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
+
+         ! Thierry - at initial times when rmachp and vmag are very
+         ! small, we would get very large CD (>100)
+         ! This leads to NaN projected force when PseudoTurbulence is 
+         ! enabled. One fix I'm trying is to cycle when rmachp and vmag
+         ! are small
+
+         ! Store drag coefficient for calculating Reynolds Subgrid
+         ! Stress of the Eulerian Mean Model
+         ppiclf_rprop(PPICLF_R_JCD,i) = cd 
 
 !
 ! Step 3: Force fluctuation for quasi-steady force
@@ -665,7 +677,17 @@
 
 !
 ! Step 10: Set ydot for all PPICLF_SLN number of equations
-!
+
+         !if(vmag .lt. 1.0 .or. rmachp .lt. 1.d-3) then
+         !  fqsx = 0.0d0; fqsy = 0.0d0; fqsz = 0.0d0
+         !  famx = 0.0d0; famy = 0.0d0; famz = 0.0d0
+         !  fdpdx = 0.0d0; fdpdy=0.0d0; fdpdz = 0.0d0
+         !  fvux = 0.0d0; fvuy = 0.0d0; fvuz = 0.0d0
+         !  liftx = 0.0d0; lifty = 0.0d0; liftz = 0.0d0
+         !  fcx = 0.0d0; fcy = 0.0d0; fcz = 0.0d0
+         !  Rsg = 0.0d0; 
+         !endif
+
          ppiclf_ydot(PPICLF_JX ,i) = ppiclf_y(PPICLF_JVX,i)
          ppiclf_ydot(PPICLF_JY ,i) = ppiclf_y(PPICLF_JVY,i)
          ppiclf_ydot(PPICLF_JZ, i) = ppiclf_y(PPICLF_JVZ,i)
@@ -789,27 +811,26 @@
 !
 ! Step 13: Store forces
 !
-         !ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
          ! Thierry - just testing this for now to see if it makes a difference in R_perp
-         ppiclf_rprop(PPICLF_R_FQSX,i)  = cd 
-         ppiclf_rprop(PPICLF_R_FQSY,i)  = fqsy
-         ppiclf_rprop(PPICLF_R_FQSZ,i)  = fqsz
-         ppiclf_rprop(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
-         ppiclf_rprop(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
-         ppiclf_rprop(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
-         ppiclf_rprop(PPICLF_R_FAMBX,i) = FamBinary(1)
-         ppiclf_rprop(PPICLF_R_FAMBY,i) = FamBinary(2)
-         ppiclf_rprop(PPICLF_R_FAMBZ,i) = FamBinary(3)
-         ppiclf_rprop(PPICLF_R_FCX,i)   = fcx
-         ppiclf_rprop(PPICLF_R_FCY,i)   = fcy
-         ppiclf_rprop(PPICLF_R_FCZ,i)   = fcz
-         ppiclf_rprop(PPICLF_R_FVUX,i)  = fvux
-         ppiclf_rprop(PPICLF_R_FVUY,i)  = fvuy
-         ppiclf_rprop(PPICLF_R_FVUZ,i)  = fvuz
-         ppiclf_rprop(PPICLF_R_QQ,i)    = qq
-         ppiclf_rprop(PPICLF_R_FPGX,i)  = fdpdx
-         ppiclf_rprop(PPICLF_R_FPGY,i)  = fdpdy
-         ppiclf_rprop(PPICLF_R_FPGZ,i)  = fdpdz
+         ppiclf_rprop5(PPICLF_R_FQSX,i)  = fqsx
+         ppiclf_rprop5(PPICLF_R_FQSY,i)  = fqsy
+         ppiclf_rprop5(PPICLF_R_FQSZ,i)  = fqsz
+         ppiclf_rprop5(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
+         ppiclf_rprop5(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
+         ppiclf_rprop5(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
+         ppiclf_rprop5(PPICLF_R_FAMBX,i) = FamBinary(1)
+         ppiclf_rprop5(PPICLF_R_FAMBY,i) = FamBinary(2)
+         ppiclf_rprop5(PPICLF_R_FAMBZ,i) = FamBinary(3)
+         ppiclf_rprop5(PPICLF_R_FCX,i)   = fcx
+         ppiclf_rprop5(PPICLF_R_FCY,i)   = fcy
+         ppiclf_rprop5(PPICLF_R_FCZ,i)   = fcz
+         ppiclf_rprop5(PPICLF_R_FVUX,i)  = fvux
+         ppiclf_rprop5(PPICLF_R_FVUY,i)  = fvuy
+         ppiclf_rprop5(PPICLF_R_FVUZ,i)  = fvuz
+         ppiclf_rprop5(PPICLF_R_QQ,i)    = qq
+         ppiclf_rprop5(PPICLF_R_FPGX,i)  = fdpdx
+         ppiclf_rprop5(PPICLF_R_FPGY,i)  = fdpdy
+         ppiclf_rprop5(PPICLF_R_FPGZ,i)  = fdpdz
 
 !
 ! Step 14: If debug mode is ON, calculate and print the max values.

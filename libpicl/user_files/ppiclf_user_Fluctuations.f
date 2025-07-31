@@ -434,7 +434,7 @@
         ! of bounds values
 
         ! not sure if I should take phi range of Mehrabadi or Osnes yet
-        phi = max(0.1d0, min(0.3d0, rphip))
+        phi = max(0.01d0, min(0.3d0, rphip))
         mp  = max(0.0d0, min(0.87d0, rmachp))
         re  = max(30.0d0, min(266.0d0, rep))
           
@@ -473,6 +473,7 @@ c------ ! Lagrangian Model
         xi_par = s_par * Z1
 
         ! Normalize Mean Data
+        cd_average = max(1.d-8, cd_average) ! prevent NaN 
         cd_average = cd_average / denum
         Rmean_par = Rmean_par / denum
         Rmean_perp = Rmean_perp / denum
@@ -501,7 +502,7 @@ c--  Multiply Lagrangian Model by the Eulerian Mean Model
         ! This is what Osnes plots
         R_par_plot = A1P + A2P * CD_prime / cd_average + xi_par
         R_perp_plot = A3P * CD_prime / cd_average + xi_perp
-  
+
 c---  Q = [avec | bvec | cvec], 3x3 matrix
         do m=1,3
           Q(m,1) = avec(m)
@@ -538,14 +539,15 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !        Rsg(3,3) = Rsg(2,2) 
 !c----- 
 
-        if(iStage.eq.3) then
-        write(100, *) ppiclf_time, i, re, phi, mp, ! 0-4
-     >                cd_average, CD_prime, fqs_fluct,     ! 5-9
-     >                R_par, R_perp,               ! 10-11
-     >                Rmean_par, Rmean_perp,       ! 12-13
-     >                R_par_plot, R_perp_plot      ! 14-15
-
-        endif
+!        if(iStage.eq.3) then
+!        write(100, *) ppiclf_time, i, re, phi, mp, ! 0-4
+!     >                cd_average, CD_prime, fqs_fluct,     ! 5-9
+!     >                R_par, R_perp,               ! 10-11
+!     >                Rmean_par, Rmean_perp,       ! 12-13
+!     >                R_par_plot, R_perp_plot,     ! 14-15
+!     >                cd                           ! 16  
+!
+!        endif
       
       endif ! pseudoTurb_flag
 

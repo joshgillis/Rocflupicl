@@ -1,6 +1,6 @@
 #define PPICLF_LPART 20000
 #define PPICLF_LRS 12
-#define PPICLF_LRP 64
+#define PPICLF_LRP 46
 #define PPICLF_LEE 75000
 #define PPICLF_LEX 2
 #define PPICLF_LEY 2
@@ -70,30 +70,12 @@
 #define PPICLF_R_JDPVDX 40
 #define PPICLF_R_JDPVDY 41
 #define PPICLF_R_JDPVDZ 42
-#define PPICLF_R_FQSX 43
-#define PPICLF_R_FQSY 44
-#define PPICLF_R_FQSZ 45
-#define PPICLF_R_FAMX 46
-#define PPICLF_R_FAMY 47
-#define PPICLF_R_FAMZ 48
-#define PPICLF_R_FAMBX 49
-#define PPICLF_R_FAMBY 50
-#define PPICLF_R_FAMBZ 51
-#define PPICLF_R_FCX 52
-#define PPICLF_R_FCY 53
-#define PPICLF_R_FCZ 54
-#define PPICLF_R_FVUX 55
-#define PPICLF_R_FVUY 56
-#define PPICLF_R_FVUZ 57
-#define PPICLF_R_QQ 58
-#define PPICLF_R_FPGX 59 
-#define PPICLF_R_FPGY 60 
-#define PPICLF_R_FPGZ 61 
-#define PPICLF_R_JSDOX 62
-#define PPICLF_R_JSDOY 63
-#define PPICLF_R_JSDOZ 64
+#define PPICLF_R_JSDOX 43
+#define PPICLF_R_JSDOY 44
+#define PPICLF_R_JSDOZ 45
+#define PPICLF_R_JCD 46
 
-! rprop4: PPICLF_LRP4
+! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 #define PPICLF_R_JRSG11 1
 #define PPICLF_R_JRSG12 2
 #define PPICLF_R_JRSG13 3
@@ -103,6 +85,27 @@
 #define PPICLF_R_JRSG31 7
 #define PPICLF_R_JRSG32 8
 #define PPICLF_R_JRSG33 9
+
+! rprop5: PPICLF_LRP5 - Storing Force Models
+#define PPICLF_R_FQSX 1
+#define PPICLF_R_FQSY 2
+#define PPICLF_R_FQSZ 3
+#define PPICLF_R_FAMX 4
+#define PPICLF_R_FAMY 5
+#define PPICLF_R_FAMZ 6
+#define PPICLF_R_FAMBX 7
+#define PPICLF_R_FAMBY 8
+#define PPICLF_R_FAMBZ 9
+#define PPICLF_R_FCX 10
+#define PPICLF_R_FCY 11
+#define PPICLF_R_FCZ 12
+#define PPICLF_R_FVUX 13
+#define PPICLF_R_FVUY 14
+#define PPICLF_R_FVUZ 15
+#define PPICLF_R_QQ 16
+#define PPICLF_R_FPGX 17 
+#define PPICLF_R_FPGY 18 
+#define PPICLF_R_FPGZ 19 
 
 ! map: PPICLF_LRP_PRO
 #define PPICLF_P_JPHIP 1
