@@ -329,6 +329,17 @@
          !       shock arrives
          if (vmag <= 1.d-8) cycle
 
+
+         ! Thierry - at initial times when rmachp and vmag are very
+         ! small, we would get very large CD (>100)
+         ! This leads to NaN projected force when PseudoTurbulence is 
+         ! enabled. One fix I'm trying is to cycle when rmachp and vmag
+         ! are small
+
+         ! Thierry - seeing if that fixes the issue of very large CD
+         ! initially 
+         !if(vmag .lt. 1.0 .or. rmachp .lt. 1.d-3) cycle
+
          ! TLJ - redefined rprop(PPICLF_R_JSPT,i) to be the particle
          !   velocity magnitude for plotting purposes - 01/03/2025
          ppiclf_rprop(PPICLF_R_JSPT,i) = sqrt(
@@ -448,18 +459,18 @@
 
            icpmean  = 1 ! used to normalize later
 
-           ! capping values to bounds provided by Osnes
-! Trying to replicate Osnes's data           
-           !rphip   = 0.2d0
-           !rmachp  = 0.67d0
-           !rep     = 71.0d0
-!========================
-           ! phi, rem ranges are taken from Mehrabadi et al. 
-           phi = max(0.1d0, min(0.3d0, rphip))  
-           mp  = max(0.0d0, min(0.87d0, rmachp))
-           re  = max(30.0d0, min(266.0d0, rep))
-           rem = (1.0-phi)*re 
-           rem = max(0.01d0, min(300.0d0, rem))
+           ! Capping values to bounds provided by Osnes
+           ! Mehrabadi et al. use volf bounds to be [0.1, 0.5]
+           ! Osnes et al use volf bounds to be [0, 0.3]
+           ! We adopt volf bounds to be [0.01, 0.62]
+
+           phi = max(0.01d0, min(0.62d0, rphip))  
+           !mp  = max(0.0d0, min(0.87d0, rmachp))
+           !re  = max(30.0d0, min(266.0d0, rep))
+           mp  = rmachp
+           re  = rep
+           rem = (1.0-phi)*re
+           !rem = max(0.01d0, min(300.0d0, rem))
            
 
                                                                        
@@ -514,11 +525,6 @@
          fqsy = beta*vy
          fqsz = beta*vz
 
-         ! Thierry - at initial times when rmachp and vmag are very
-         ! small, we would get very large CD (>100)
-         ! This leads to NaN projected force when PseudoTurbulence is 
-         ! enabled. One fix I'm trying is to cycle when rmachp and vmag
-         ! are small
 
          ! Store drag coefficient for calculating Reynolds Subgrid
          ! Stress of the Eulerian Mean Model
@@ -677,16 +683,6 @@
 
 !
 ! Step 10: Set ydot for all PPICLF_SLN number of equations
-
-         !if(vmag .lt. 1.0 .or. rmachp .lt. 1.d-3) then
-         !  fqsx = 0.0d0; fqsy = 0.0d0; fqsz = 0.0d0
-         !  famx = 0.0d0; famy = 0.0d0; famz = 0.0d0
-         !  fdpdx = 0.0d0; fdpdy=0.0d0; fdpdz = 0.0d0
-         !  fvux = 0.0d0; fvuy = 0.0d0; fvuz = 0.0d0
-         !  liftx = 0.0d0; lifty = 0.0d0; liftz = 0.0d0
-         !  fcx = 0.0d0; fcy = 0.0d0; fcz = 0.0d0
-         !  Rsg = 0.0d0; 
-         !endif
 
          ppiclf_ydot(PPICLF_JX ,i) = ppiclf_y(PPICLF_JVX,i)
          ppiclf_ydot(PPICLF_JY ,i) = ppiclf_y(PPICLF_JVY,i)

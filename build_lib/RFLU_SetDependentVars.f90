@@ -105,9 +105,20 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
 
 ! y, y1, ydot, ydotc: 12
 
-! rprop: 64
+! rprop: 53
+! probably delete below ones later; using them for plotting
 
-! map: 10
+! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
+
+! rprop5: PPICLF_LRP5 - Storing Force Models
+
+! map: 19
+!--- x,y,z Forces to Rocflu
+!---
+!--- Add comment about these terms 
+!--- Reynolds Subgrid Stress Tensor
+
+
 
 
 

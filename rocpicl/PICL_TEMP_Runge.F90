@@ -834,11 +834,10 @@ pGc => pRegion%mixt%gradCell
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JSDOY,SDOY)  
       CALL ppiclf_solve_InterpFieldUser(PPICLF_R_JSDOZ,SDOZ)  
 
-!---------------------------------------------------------------------------------------
-! 07/22/2025 - Thierry Daoud - Integration Should Happen Before Projecting Back to the Fluid
-!SOLVE
+! Time Maching of particle solution
+
      CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
-!---------------------------------------------------------------------------------------
+     
 !FEED BACK TERM
 !Fill arrays for interp field
 IF (global%piclFeedbackFlag == 1) THEN
@@ -1044,12 +1043,6 @@ endif
 !---------------------------------------------------------------------------------------
 
 END IF ! global%piclFeedbackFlag
-
-!----------------------------------------------------------------------------------
-! 07/22/2025 - Thierry Daoud - THIS SHOULD NOT BE HERE !!!
-!SOLVE
-!!!!!!!!!     CALL ppiclf_solve_IntegrateParticle(1,piclIO,piclDtMin,piclCurrentTime)
-!----------------------------------------------------------------------------------
 
 !
 !Due to moving particle integration stuff stoping this for now

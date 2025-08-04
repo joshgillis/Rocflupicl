@@ -49,11 +49,14 @@
 !
       TwoPi = 2.0d0*acos(-1.0d0)
 
+
       if (qs_fluct_filter_flag==0) then
          denum = max(dfloat(icpmean),1.d0)  ! for arithmetic mean
       else if (qs_fluct_filter_flag==1) then
          denum = max(phipmean,1.0e-6)  ! for volume mean
       endif
+      
+
       upmean = upmean / denum
       vpmean = vpmean / denum
       wpmean = wpmean / denum
@@ -216,13 +219,10 @@
       real*8 cosrand,sinrand
       real*8 eunit(3)
 
-      real*8 s_par, s_perp,                               
-     >       xi_par, xi_perp,                             
-     >       R_par, R_perp                              
-      real*8 cd
-      integer*4 m, n
+      integer*4 m
+      real*8 s_par, s_perp, xi_par, xi_perp, R_par, R_perp, cd
       real*8 R(3,3), Q(3,3), Qt(3,3) 
-      real*8 R_par_plot, R_perp_plot
+      real*8 denom, eps
 
 !
 ! Code:
@@ -234,6 +234,7 @@
       else if (qs_fluct_filter_flag==1) then
          denum = max(phipmean,1.0e-6)  ! for volume mean
       endif
+      
       upmean = upmean / denum
       vpmean = vpmean / denum
       wpmean = wpmean / denum
@@ -429,18 +430,35 @@
 ! Pseudo-Turbulence Calculations starts here 
       if(pseudoTurb_flag==1) then
 
+        if (qs_fluct_filter_flag==0) then
+           denum = max(dfloat(icpmean),1.d0)  ! for arithmetic mean
+        else if (qs_fluct_filter_flag==1) then
+           denum = max(phipmean,1.0e-6)  ! for volume mean
+        endif
+
         ! Setting upper and lower bounds for 
         ! rmachp, rphip, and rep otherwise R_perp is very high for out
         ! of bounds values
 
         ! not sure if I should take phi range of Mehrabadi or Osnes yet
-        phi = max(0.01d0, min(0.3d0, rphip))
-        mp  = max(0.0d0, min(0.87d0, rmachp))
-        re  = max(30.0d0, min(266.0d0, rep))
+        !phi = max(0.01d0, min(0.3d0, rphip))
+        phi = max(0.01d0, min(0.62d0, rphip))
+        !mp  = max(0.0d0, min(0.87d0, rmachp))
+        !re  = max(30.0d0, min(266.0d0, rep))
+        mp = rmachp
+        re = rep
           
 c------ ! Lagrangian Model
   
-        A1P = F1P / (phi + F2P)
+        denom = phi + F2P
+        eps = 1.0d-2
+
+        ! Avoid singularity for A1P
+        if (abs(denom) .lt. eps) then
+            denom = sign(eps, denom)   
+        endif                        
+
+        A1P = F1P / denom
   
         if(CD_prime .lt. 0.0) then               
           A2P = F3P - 0.2 * F3P / min(0.2, phi)   
@@ -492,16 +510,8 @@ c------ ! Lagrangian Model
 
 c--  Multiply Lagrangian Model by the Eulerian Mean Model
       
-        ! Checking if normalization is the issue
-!        Rmean_par = 1.0d0 + A1P
-!        Rmean_perp = 1.0d0
-!-----------------------------
         R_par  = R_par  * Rmean_par 
         R_perp = R_perp * Rmean_perp
-
-        ! This is what Osnes plots
-        R_par_plot = A1P + A2P * CD_prime / cd_average + xi_par
-        R_perp_plot = A3P * CD_prime / cd_average + xi_perp
 
 c---  Q = [avec | bvec | cvec], 3x3 matrix
         do m=1,3
@@ -529,26 +539,33 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
         Rsg = matmul(Q, matmul(R,Qt))
 
+        ! storing for plotting - to delete later
+        ppiclf_rprop(PPICLF_R_JCDAverage,i) = cd_average
+        ppiclf_rprop(PPICLF_R_JCDPrime,i) = CD_prime
+        ppiclf_rprop(PPICLF_R_JRSGPar,i) = R_par
+        ppiclf_rprop(PPICLF_R_JRSGPerp,i) = R_perp
+        ppiclf_rprop(PPICLF_R_JRSGParMean,i) = Rmean_par
+        ppiclf_rprop(PPICLF_R_JRSGPerpMean,i) = Rmean_perp
+        ppiclf_rprop(PPICLF_R_JDENUM,i) = denum
 
-!c--- trying an anaylyitcal function to validate the gradient
-!        Rsg = 0.0d0
-!        Rsg(1,1) = 1.0d0
-!
-!        Rsg(2,2) = 1.0d0
-!
-!        Rsg(3,3) = Rsg(2,2) 
-!c----- 
+        R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par 
 
-!        if(iStage.eq.3) then
-!        write(100, *) ppiclf_time, i, re, phi, mp, ! 0-4
-!     >                cd_average, CD_prime, fqs_fluct,     ! 5-9
-!     >                R_par, R_perp,               ! 10-11
-!     >                Rmean_par, Rmean_perp,       ! 12-13
-!     >                R_par_plot, R_perp_plot,     ! 14-15
-!     >                cd                           ! 16  
-!
-!        endif
-      
+        if(R_par .lt. -50.0d0 .or. R_par .gt. 50.0d0) then
+          print*, "***ERROR*** VERY HIGH RSG PARALLEL"
+          print*, "ppiclf_time, ppiclf_nid, i, denum =", 
+     >    ppiclf_time, ppiclf_nid, i, denum
+          print*, "phi, re, mp =", phi, re, mp
+          print*, "F1P, F2P =", F1P, F2P
+          print*, "F2P + phi = ", F2P + phi
+          print*, "F1P/(F2P + phi) =", F1P / (phi + F2P)
+          print*, "A1P, A2P, xi_par =", A1P, A2P, xi_par
+          print*, "CD_prime, cd_average, cd =", CD_prime, 
+     >           cd_average, cd
+          print*, "R_par, Rmean_par =", R_par, Rmean_par
+          
+          STOP
+        endif
+
       endif ! pseudoTurb_flag
 
       return
