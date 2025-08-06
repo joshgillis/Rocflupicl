@@ -389,8 +389,10 @@
 !--- get mp, re, and phip for the neighbors. 
 !--- rmu is used for the particle for the sake of simplicity for now
 
-           vmagj  = sqrt(yj(PPICLF_JVX)**2 + yj(PPICLF_JVY)**2 
-     >                 + yj(PPICLF_JVZ)**2)
+           vmagj  = sqrt((rpropj(PPICLF_R_JUX) - yj(PPICLF_JVX))**2 
+     >                 + (rpropj(PPICLF_R_JUY) - yj(PPICLF_JVY))**2 
+     >                 + (rpropj(PPICLF_R_JUZ) - yj(PPICLF_JVZ))**2)
+
            asndfj = rpropj(PPICLF_R_JCS)
            mpj     = vmagj/asndfj
            rhofj  = rpropj(PPICLF_R_JRHOF)
@@ -400,15 +402,13 @@
 
            phij    = rpropj(PPICLF_R_JPHIP)
 
-           ! phi, rem ranges are taken from Mehrabadi et al. 
-           !phi = max(0.1d0, min(0.3d0, phij))
+           v2magmean = v2magmean + vmagj**2
+
+           ! capping volume fraction only
            phi = max(0.01d0, min(0.62d0, rphip))
-           !mp  = max(0.0d0, min(0.87d0, mpj))
-           !re  = max(30.0d0, min(266.0d0, rej))
            mp  = rmachp
            re  = rep
            rem = (1.0-phi)*re 
-           !rem = max(0.01d0, min(300.0d0, rem))
 
 
         ! Reynolds number and vol fraction dependent k^tilde and b_par 

@@ -382,7 +382,7 @@
          !--- Added for PseudoTurbulence
          k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
          Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
-         cd_average = 0.0d0; cd = 0.0d0
+         cd_average = 0.0d0; cd = 0.0d0; v2magmean = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -465,14 +465,11 @@
            ! We adopt volf bounds to be [0.01, 0.62]
 
            phi = max(0.01d0, min(0.62d0, rphip))  
-           !mp  = max(0.0d0, min(0.87d0, rmachp))
-           !re  = max(30.0d0, min(266.0d0, rep))
            mp  = rmachp
            re  = rep
            rem = (1.0-phi)*re
-           !rem = max(0.01d0, min(300.0d0, rem))
-           
 
+           v2magmean= v2magmean + vmag**2  
                                                                        
         ! Reynolds number and vol fraction dependent k^tilde and b_par 
            k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 

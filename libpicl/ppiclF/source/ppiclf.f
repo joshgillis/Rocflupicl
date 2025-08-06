@@ -384,7 +384,7 @@
          !--- Added for PseudoTurbulence
          k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
          Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
-         cd_average = 0.0d0; cd = 0.0d0
+         cd_average = 0.0d0; cd = 0.0d0; v2magmean = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -467,14 +467,11 @@
            ! We adopt volf bounds to be [0.01, 0.62]
 
            phi = max(0.01d0, min(0.62d0, rphip))  
-           !mp  = max(0.0d0, min(0.87d0, rmachp))
-           !re  = max(30.0d0, min(266.0d0, rep))
            mp  = rmachp
            re  = rep
            rem = (1.0-phi)*re
-           !rem = max(0.01d0, min(300.0d0, rem))
-           
 
+           v2magmean= v2magmean + vmag**2  
                                                                        
         ! Reynolds number and vol fraction dependent k^tilde and b_par 
            k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
@@ -2141,15 +2138,7 @@
            denum = max(phipmean,1.0e-6)  ! for volume mean
         endif
 
-        ! Setting upper and lower bounds for 
-        ! rmachp, rphip, and rep otherwise R_perp is very high for out
-        ! of bounds values
-
-        ! not sure if I should take phi range of Mehrabadi or Osnes yet
-        !phi = max(0.01d0, min(0.3d0, rphip))
         phi = max(0.01d0, min(0.62d0, rphip))
-        !mp  = max(0.0d0, min(0.87d0, rmachp))
-        !re  = max(30.0d0, min(266.0d0, rep))
         mp = rmachp
         re = rep
           
@@ -2179,20 +2168,15 @@ c------ ! Lagrangian Model
   
         call RANDOM_NUMBER(UnifRnd)
         
+! Box-Muller transform for generating two independent standard normal
+! (Gaussian) random variables
+! Z1 & Z2 are standard normal random variables
         Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
-        Z2 = sqrt(-2.0d0*log(UnifRnd(1))) * sin(TwoPi*UnifRnd(2))
+        Z2 = sqrt(-2.0d0*log(UnifRnd(3))) * sin(TwoPi*UnifRnd(4))
 
-        ! sanity check 
-        if (UnifRnd(1) < 1.0d-10) then
-          print*, "UnifRnd(1) !!!!!", UnifRnd(1)
-          UnifRnd(1) = 1.0d-10
-        endif
+        cosrand = cos(TwoPi*UnifRnd(5))
+        sinrand = sin(TwoPi*UnifRnd(5)) 
 
-        if (UnifRnd(2) < 1.0d-10) then
-          print*, "UnifRnd(2) !!!!!", UnifRnd(2)
-          UnifRnd(2) = 1.0d-10
-        endif
-  
         xi_par = s_par * Z1
 
         ! Normalize Mean Data
@@ -2200,11 +2184,15 @@ c------ ! Lagrangian Model
         cd_average = cd_average / denum
         Rmean_par = Rmean_par / denum
         Rmean_perp = Rmean_perp / denum
+        v2magmean = v2magmean / denum
+
+c--  Multiply by the mean relative flow kinetic energy to dimentionalize      
+        Rmean_par  = Rmean_par  * 0.5d0 * v2magmean
+        Rmean_perp = Rmean_perp * 0.5d0 * v2magmean
   
         ! Lagrangian Reynolds Subgrid Stress - Parallel Component
         R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par
   
-        
         A3P = G1P + G2P/(phi + G3P) + G4P * mp
         s_perp = G5P/(phi + G6P) + (G7P*re)/(300.0*phi) + G8P
   
@@ -2214,11 +2202,12 @@ c------ ! Lagrangian Model
         R_perp = 1.0 + A3P * CD_prime / cd_average + xi_perp
 
 c--  Multiply Lagrangian Model by the Eulerian Mean Model
-      
         R_par  = R_par  * Rmean_par 
         R_perp = R_perp * Rmean_perp
 
 c---  Q = [avec | bvec | cvec], 3x3 matrix
+c---  avec : unit vector in main direction
+c---  bvec, cvec: two orthogonal vectors to avec
         do m=1,3
           Q(m,1) = avec(m)
           Q(m,2) = bvec(m)
@@ -2237,39 +2226,21 @@ c---     | 0       0   , R_perp|
   
 c---  R matrix only has diagonal components
         R(1,1) = R_par
-        R(2,2) = R_perp
-        R(3,3) = R_perp
+        R(2,2) = R_perp*cosrand
+        R(3,3) = R_perp*sinrand
   
 c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
         Rsg = matmul(Q, matmul(R,Qt))
 
         ! storing for plotting - to delete later
-        ppiclf_rprop(PPICLF_R_JCDAverage,i) = cd_average
-        ppiclf_rprop(PPICLF_R_JCDPrime,i) = CD_prime
-        ppiclf_rprop(PPICLF_R_JRSGPar,i) = R_par
-        ppiclf_rprop(PPICLF_R_JRSGPerp,i) = R_perp
-        ppiclf_rprop(PPICLF_R_JRSGParMean,i) = Rmean_par
+        ppiclf_rprop(PPICLF_R_JCDAverage,i)   = cd_average
+        ppiclf_rprop(PPICLF_R_JCDPrime,i)     = CD_prime
+        ppiclf_rprop(PPICLF_R_JRSGPar,i)      = R_par
+        ppiclf_rprop(PPICLF_R_JRSGPerp,i)     = R_perp
+        ppiclf_rprop(PPICLF_R_JRSGParMean,i)  = Rmean_par
         ppiclf_rprop(PPICLF_R_JRSGPerpMean,i) = Rmean_perp
-        ppiclf_rprop(PPICLF_R_JDENUM,i) = denum
-
-        R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par 
-
-        if(R_par .lt. -50.0d0 .or. R_par .gt. 50.0d0) then
-          print*, "***ERROR*** VERY HIGH RSG PARALLEL"
-          print*, "ppiclf_time, ppiclf_nid, i, denum =", 
-     >    ppiclf_time, ppiclf_nid, i, denum
-          print*, "phi, re, mp =", phi, re, mp
-          print*, "F1P, F2P =", F1P, F2P
-          print*, "F2P + phi = ", F2P + phi
-          print*, "F1P/(F2P + phi) =", F1P / (phi + F2P)
-          print*, "A1P, A2P, xi_par =", A1P, A2P, xi_par
-          print*, "CD_prime, cd_average, cd =", CD_prime, 
-     >           cd_average, cd
-          print*, "R_par, Rmean_par =", R_par, Rmean_par
-          
-          STOP
-        endif
+        ppiclf_rprop(PPICLF_R_JDENUM,i)       = denum
 
       endif ! pseudoTurb_flag
 
@@ -4586,8 +4557,10 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 !--- get mp, re, and phip for the neighbors. 
 !--- rmu is used for the particle for the sake of simplicity for now
 
-           vmagj  = sqrt(yj(PPICLF_JVX)**2 + yj(PPICLF_JVY)**2 
-     >                 + yj(PPICLF_JVZ)**2)
+           vmagj  = sqrt((rpropj(PPICLF_R_JUX) - yj(PPICLF_JVX))**2 
+     >                 + (rpropj(PPICLF_R_JUY) - yj(PPICLF_JVY))**2 
+     >                 + (rpropj(PPICLF_R_JUZ) - yj(PPICLF_JVZ))**2)
+
            asndfj = rpropj(PPICLF_R_JCS)
            mpj     = vmagj/asndfj
            rhofj  = rpropj(PPICLF_R_JRHOF)
@@ -4597,15 +4570,13 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
 
            phij    = rpropj(PPICLF_R_JPHIP)
 
-           ! phi, rem ranges are taken from Mehrabadi et al. 
-           !phi = max(0.1d0, min(0.3d0, phij))
+           v2magmean = v2magmean + vmagj**2
+
+           ! capping volume fraction only
            phi = max(0.01d0, min(0.62d0, rphip))
-           !mp  = max(0.0d0, min(0.87d0, mpj))
-           !re  = max(30.0d0, min(266.0d0, rej))
            mp  = rmachp
            re  = rep
            rem = (1.0-phi)*re 
-           !rem = max(0.01d0, min(300.0d0, rem))
 
 
         ! Reynolds number and vol fraction dependent k^tilde and b_par 

@@ -972,6 +972,11 @@ endif
          pRegion%mixt%piclJF(2,:) = JFYCell(:)
          pRegion%mixt%piclJF(3,:) = JFZCell(:)
 
+         ! K_sg = 1/(2*rhof) * tr(Rsg)
+         ! K_sg to compare with Total Energy of Fluid
+         pRegion%mixt%piclKsg = 1.0_RFREAL/(2.0_RFREAL*pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)) &
+                                * (JRSGCell(1,:) + JRSGCell(5,:) + JRSGCell(9,:))
+
        if(global%piclPseudoTurbFlag .eq. 1) then
          do j = 1, 9
            ! \phi_g R_sg
