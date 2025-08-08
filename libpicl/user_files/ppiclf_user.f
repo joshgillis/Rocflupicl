@@ -54,6 +54,7 @@
       real*8 fqsx, fqsy, fqsz
       real*8 fqsforce
       real*8 fqs_fluct(3)
+      real*8 xi_par, xi_perp
       real*8 famx, famy, famz 
       real*8 fdpdx, fdpdy, fdpdz
       real*8 fdpvdx, fdpvdy, fdpvdz
@@ -454,53 +455,6 @@
             end if 
          end if ! qs_fluct_flag .and. vmag
 
-         ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
-         if(pseudoTurb_flag==1) then
-
-           icpmean  = 1 ! used to normalize later
-
-           ! Capping values to bounds provided by Osnes
-           ! Mehrabadi et al. use volf bounds to be [0.1, 0.5]
-           ! Osnes et al use volf bounds to be [0, 0.3]
-           ! We adopt volf bounds to be [0.01, 0.62]
-
-           phi = max(0.01d0, min(0.62d0, rphip))  
-           mp  = rmachp
-           re  = rep
-           rem = (1.0-phi)*re
-
-           v2magmean= v2magmean + vmag**2  
-                                                                       
-        ! Reynolds number and vol fraction dependent k^tilde and b_par 
-           k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
-     >            exp(-phi*(rem**0.5))                                 
-                                                                       
-           b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
-     >             exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
-                                                                       
-        ! Mach number corrections                                      
-           k_Mach = phi*(C1P + C2P*phi + re**C3P) * 
-     >           (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
-           b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
-     >            phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
-     >            (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
-                                                                       
-        ! Corrected k^tilde and b_par components                       
-           k_tilde = k_tilde*(1.0d0 + k_Mach)
-           b_par  = b_par*(1.0d0 + b_Mach)
-           b_perp = -b_par/2.0d0
-                                                                       
-        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
-           Rmean_par  = 2.0d0*k_tilde*(b_par  + 1.0d0/3.0d0)
-                                                                       
-        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
-           Rmean_perp = 2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
-
-        ! Add the particle's drag coefficient of previous RK step
-           cd_average = cd_average + ppiclf_rprop(PPICLF_R_JCD,i)
-
-         endif ! pseudoTurb_flag
-
          ! add neighbors
          IF ( sbNearest_flag .EQ. 1) THEN
             CALL ppiclf_solve_NearestNeighborSB(
@@ -525,7 +479,7 @@
 
          ! Store drag coefficient for calculating Reynolds Subgrid
          ! Stress of the Eulerian Mean Model
-         ppiclf_rprop(PPICLF_R_JCD,i) = cd 
+         !ppiclf_rprop(PPICLF_R_JCD,i) = cd 
 
 !
 ! Step 3: Force fluctuation for quasi-steady force
@@ -535,7 +489,8 @@
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
          elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct)
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct,
+     >                                      xi_par,xi_perp )
          endif
 
          ! Add fluctuation part to quasi-steady force
@@ -547,6 +502,10 @@
          ppiclf_rprop(PPICLF_R_FLUCTFX,i) = fqs_fluct(1)
          ppiclf_rprop(PPICLF_R_FLUCTFY,i) = fqs_fluct(2)
          ppiclf_rprop(PPICLF_R_FLUCTFZ,i) = fqs_fluct(3)
+         
+         ! Store normally distributed random variables xi for PseudoTurbulence
+         ppiclf_rprop(PPICLF_R_XIPAR,i)  = xi_par
+         ppiclf_rprop(PPICLF_R_XIPERP,i) = xi_perp
 
 !
 ! Step 4: Force component added mass

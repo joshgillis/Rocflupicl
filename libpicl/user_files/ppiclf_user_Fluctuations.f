@@ -195,7 +195,8 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct)
+      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct,
+     >                                      xi_par,xi_perp)
 !
       implicit none
 !
@@ -223,7 +224,7 @@
       real*8 s_par, s_perp, xi_par, xi_perp, R_par, R_perp, cd
       real*8 R(3,3), Q(3,3), Qt(3,3) 
       real*8 denom, eps
-
+      real*8 k_Osnes, b_Osnes, b_Mach_t1, b_Mach_t2
 !
 ! Code:
 !
@@ -429,76 +430,107 @@
 !---------------------------------------------------------------------------
 ! Pseudo-Turbulence Calculations starts here 
       if(pseudoTurb_flag==1) then
-
-        if (qs_fluct_filter_flag==0) then
-           denum = max(dfloat(icpmean),1.d0)  ! for arithmetic mean
-        else if (qs_fluct_filter_flag==1) then
-           denum = max(phipmean,1.0e-6)  ! for volume mean
-        endif
-
         phi = max(0.01d0, min(0.62d0, rphip))
         mp = rmachp
         re = rep
-          
+        rem = (1.0-phi)*re
+         ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
+                                                                       
+        ! Reynolds number and vol fraction dependent k^tilde and b_par 
+        k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
+     >         exp(-phi*(rem**0.5))                                 
+                                                                    
+        b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+     >          exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
+                                                                       
+        ! Mach number corrections                                      
+        k_Mach = phi*(C1P + C2P*phi + re**C3P) * 
+     >        (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
+        b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
+     >         phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
+     >         (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
+
+        b_Mach_t1 = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
+     >         phi*(D4P + D5P*(re/300.0)**2 + D6P*phi))
+        b_Mach_t2 = (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
+                                                                       
+        ! Corrected k^tilde and b_par components                       
+        k_Osnes = k_tilde*(1.0d0 + k_Mach)
+        b_Osnes  = b_par*(1.0d0 + b_Mach)
+        b_perp = -b_Osnes/2.0d0
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
+        Rmean_par  = 2.0d0*k_Osnes*(b_Osnes  + 1.0d0/3.0d0)
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
+        Rmean_perp = 2.0d0*k_Osnes*(b_perp + 1.0d0/3.0d0)
+        
+c--  Multiply by the mean relative flow kinetic energy to dimentionalize      
+        Rmean_par  = Rmean_par  !* 0.5d0 * vmag**2
+        Rmean_perp = Rmean_perp !* 0.5d0 * vmag**2
+
 c------ ! Lagrangian Model
   
-        denom = phi + F2P
-        eps = 1.0d-2
+!        denom = phi + F2P
+!        eps = 1.0d-2
+!
+!        ! Avoid singularity for A1P
+!        if (abs(denom) .lt. eps) then
+!            denom = sign(eps, denom)   
+!        endif                        
+!
+!        A1P = F1P / denom
 
-        ! Avoid singularity for A1P
-        if (abs(denom) .lt. eps) then
-            denom = sign(eps, denom)   
-        endif                        
-
-        A1P = F1P / denom
+        ! 08/07/2025 - Ditch A1P advised by Dr. Bala
+        A1P = 0.0d0
   
-        if(CD_prime .lt. 0.0) then               
+        if(CD_frac .lt. 0.0) then               
           A2P = F3P - 0.2 * F3P / min(0.2, phi)   
-        elseif(CD_prime .ge. 0.0) then           
+        elseif(CD_frac .ge. 0.0) then           
           A2P = F4P + F5P/(phi + F6P) + F7P * mp
         else                                     
-          print*, "If statement CD_prime error in QS-Fluct 
-     >    Subroutine , PseudoTurb calculation", CD_prime     
+          print*, "If statement CD_frac error in QS-Fluct 
+     >    Subroutine , PseudoTurb calculation", CD_frac
           stop                                   
         endif                                    
+
+        A3P = G1P + G2P/(phi + G3P) + G4P * mp
   
         s_par = F8P + F9P/(phi + F10P) + F11P * mp
+        s_perp = G5P/(phi + G6P) + (G7P*re)/(300.0*phi) + G8P
+
+        tF_inv = (24.0*phi*chi/dp) * sqrt(theta/rpi)
+        aSDE = tF_inv
+        bSDE_CD = s_par *sqrt(2.0*tF_inv)
+        bSDE_CL = s_perp*sqrt(2.0*tF_inv)
   
         call RANDOM_NUMBER(UnifRnd)
         
-! Box-Muller transform for generating two independent standard normal
-! (Gaussian) random variables
-! Z1 & Z2 are standard normal random variables
+        ! Box-Muller transform for generating two independent standard normal
+        ! (Gaussian) random variables
+        ! Z1 & Z2 are standard normal random variables
         Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
         Z2 = sqrt(-2.0d0*log(UnifRnd(3))) * sin(TwoPi*UnifRnd(4))
 
-        cosrand = cos(TwoPi*UnifRnd(5))
-        sinrand = sin(TwoPi*UnifRnd(5)) 
-
-        xi_par = s_par * Z1
-
-        ! Normalize Mean Data
-        cd_average = max(1.d-8, cd_average) ! prevent NaN 
-        cd_average = cd_average / denum
-        Rmean_par = Rmean_par / denum
-        Rmean_perp = Rmean_perp / denum
-        v2magmean = v2magmean / denum
-
-c--  Multiply by the mean relative flow kinetic energy to dimentionalize      
-        Rmean_par  = Rmean_par  * 0.5d0 * v2magmean
-        Rmean_perp = Rmean_perp * 0.5d0 * v2magmean
+        ! dW1 & dW2 are scaled stochastic amplitudes       
+        dW1 = sqrt(fac)*Z1
+        dW2 = sqrt(fac)*Z2
   
+        xi_par = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPAR,i)
+     >            + bSDE_CD*dW1
+        xi_perp = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPERP,i)
+     >            + bSDE_CL*dW2
+
+        ! CD_frac is dimensionless
+        ! cd is dimensionless ? 
+        ! I need to validate how to divide them
+
         ! Lagrangian Reynolds Subgrid Stress - Parallel Component
-        R_par = 1.0 + A1P + A2P * CD_prime / cd_average + xi_par
+        R_par = 1.0 + A1P + A2P * CD_frac / cd + xi_par
   
-        A3P = G1P + G2P/(phi + G3P) + G4P * mp
-        s_perp = G5P/(phi + G6P) + (G7P*re)/(300.0*phi) + G8P
-  
-        xi_perp = s_perp * Z2
-       
         ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
-        R_perp = 1.0 + A3P * CD_prime / cd_average + xi_perp
-
+        R_perp = 1.0 + A3P * CD_frac / cd + xi_perp
+        
 c--  Multiply Lagrangian Model by the Eulerian Mean Model
         R_par  = R_par  * Rmean_par 
         R_perp = R_perp * Rmean_perp
@@ -524,16 +556,54 @@ c---     | 0       0   , R_perp|
   
 c---  R matrix only has diagonal components
         R(1,1) = R_par
-        R(2,2) = R_perp*cosrand
-        R(3,3) = R_perp*sinrand
+        R(2,2) = R_perp
+        R(3,3) = R_perp
   
 c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
-        Rsg = matmul(Q, matmul(R,Qt))
+       Rsg = matmul(Q, matmul(R,Qt))
+
+
+!-------------------------------------------------------------------------
+        if(iStage .eq. 3 .and. i<=5) then
+          write(90+i,*) ppiclf_time, re, mp, phi,
+     >                k_tilde, k_Mach, k_Osnes,
+     >                b_par, b_Mach, b_Osnes,
+     >                Rmean_par, Rmean_perp,
+     >                R_par , R_perp,
+     >                xi_par, xi_perp,
+     >                s_par, s_perp,
+     >                CD_frac, cd,
+     >                A1P, A2P, A3P,     
+     >                A2P * CD_frac / cd,
+     >                A3P * CD_frac / cd,
+     >                CD_prime,
+     >                b_Mach_t1, b_Mach_t2
+        
+
+          write(100,*) ppiclf_time, i,
+     >          R(1,1)+R(2,2)+R(3,3),
+     >          Rsg(1,1)+Rsg(2,2)+Rsg(3,3),
+     >          2.0d0*k_tilde*0.5d0*vmag**2,
+     >          Rmean_par + 2.0d0*Rmean_perp
+         
+         write(101,*) ppiclf_time, i, 
+     >          R_par, Rmean_par, 
+     >          A1P,
+     >          A2P * CD_frac / cd,
+     >          xi_par, s_par, Z1
+
+         write(102,*) ppiclf_time, i,
+     >          R_perp, Rmean_perp,
+     >          A3P * CD_frac / cd,
+     >          xi_perp, s_perp, Z2
+!-------------------------------------------------------------------------
+
+        endif
 
         ! storing for plotting - to delete later
-        ppiclf_rprop(PPICLF_R_JCDAverage,i)   = cd_average
-        ppiclf_rprop(PPICLF_R_JCDPrime,i)     = CD_prime
+        ppiclf_rprop(PPICLF_R_JCDAverage,i)   = cd
+        ppiclf_rprop(PPICLF_R_JCDFrac,i)     = CD_frac
         ppiclf_rprop(PPICLF_R_JRSGPar,i)      = R_par
         ppiclf_rprop(PPICLF_R_JRSGPerp,i)     = R_perp
         ppiclf_rprop(PPICLF_R_JRSGParMean,i)  = Rmean_par

@@ -108,7 +108,7 @@ SUBROUTINE PICL_TEMP_InitSolver( pRegion)
 
 ! y, y1, ydot, ydotc: 12
 
-! rprop: 53
+! rprop: 54
 ! probably delete below ones later; using them for plotting
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
@@ -170,7 +170,7 @@ INTEGER :: errorFlag,icg
                    zpf_factor,xpf_factor,dp,neighborWidth,dp_max_l,xp_min,xp_max, &
                    xp_min_l,xp_max_l
    REAL(KIND=8) :: y(12, 20000), &
-                   rprop(53, 20000)
+                   rprop(54, 20000)
    REAL(KIND=8), DIMENSION(:,:,:,:), ALLOCATABLE :: xGrid, yGrid, zGrid,vfP
    REAL(RFREAL),ALLOCATABLE,DIMENSION(:) :: xData,yData,zData,rData,dumData     
    REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: volp,SPL 
@@ -414,7 +414,7 @@ IF (global%restartFromScratch) THEN
     !  print*,global%myProcid,npart,i_global_min,i_global_max
    !ENDIF
 
-   rprop(1:53,1:20000) = 0.0d0
+   rprop(1:54,1:20000) = 0.0d0
   
    dp_max = 0.0d0
    xp_min_l = +17400000.0
@@ -437,7 +437,7 @@ IF (global%restartFromScratch) THEN
          y(10,i) = 0.0d0
   
          ! initially zero out all properties
-         !do ii=1,53
+         !do ii=1,54
          !  rprop(ii, i) = 0.0d0
          !end do
 

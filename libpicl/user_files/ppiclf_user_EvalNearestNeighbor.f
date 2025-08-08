@@ -352,8 +352,6 @@
          ! The mean is calcuated according to Lattanzi etal,
          !   Physical Review Fluids, 2022.
          !
-         !if (j.ne.0) then ! I don't think that's needed, we're double
-         !    checking 
          if (qs_fluct_filter_flag==0) then
             upmean   = upmean + yj(PPICLF_JVX)
             vpmean   = vpmean + yj(PPICLF_JVY)
@@ -384,65 +382,6 @@
      >                gkern*(yj(PPICLF_JVZ)**2)*rpropj(PPICLF_R_JVOLP)
             icpmean = icpmean + 1
          end if
-
-         if(pseudoTurb_flag==1) then
-!--- get mp, re, and phip for the neighbors. 
-!--- rmu is used for the particle for the sake of simplicity for now
-
-           vmagj  = sqrt((rpropj(PPICLF_R_JUX) - yj(PPICLF_JVX))**2 
-     >                 + (rpropj(PPICLF_R_JUY) - yj(PPICLF_JVY))**2 
-     >                 + (rpropj(PPICLF_R_JUZ) - yj(PPICLF_JVZ))**2)
-
-           asndfj = rpropj(PPICLF_R_JCS)
-           mpj     = vmagj/asndfj
-           rhofj  = rpropj(PPICLF_R_JRHOF)
-           dpj    = rpropj(PPICLF_R_JDP)
-
-           rej     = vmagj*dpj*rhofj/rmu
-
-           phij    = rpropj(PPICLF_R_JPHIP)
-
-           v2magmean = v2magmean + vmagj**2
-
-           ! capping volume fraction only
-           phi = max(0.01d0, min(0.62d0, rphip))
-           mp  = rmachp
-           re  = rep
-           rem = (1.0-phi)*re 
-
-
-        ! Reynolds number and vol fraction dependent k^tilde and b_par 
-           k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) *
-     >            exp(-phi*(rem**0.5))
-
-           b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
-     >             exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
-             
-        ! Mach number corrections                                      
-           k_Mach = phi*(C1P + C2P*phi + re**C3P) *
-     >           (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
-           b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
-     >            phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
-     >            (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
-
-        ! Corrected k^tilde and b_par components                       
-           k_tilde = k_tilde*(1.0d0 + k_Mach)
-           b_par  = b_par*(1.0d0 + b_Mach)
-           b_perp = -b_par/2.0d0
-
-        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
-           Rmean_par  = Rmean_par + 2.0d0*k_tilde*(b_par  + 1.0d0/3.0d0)
-
-        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
-           Rmean_perp = Rmean_perp +2.0d0*k_tilde*(b_perp + 1.0d0/3.0d0)
-
-           cd_average = cd_average + rpropj(PPICLF_R_JCD)
-         endif ! pseudoTurb_flag
-
-
-         !end if
-
-
 !-----------------------------------------------------------------------
 !
       ! boundaries
