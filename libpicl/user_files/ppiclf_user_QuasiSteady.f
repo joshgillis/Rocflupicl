@@ -19,7 +19,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Parmar(i,beta,cd)
+      subroutine ppiclf_user_QS_Parmar(i,beta)
 !
       implicit none
 !
@@ -126,7 +126,7 @@
 !   Reynolds numbers and volume fractions. 
 !
 !-----------------------------------------------------------------------
-      subroutine ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+      subroutine ppiclf_user_QS_ModifiedParmar(i,beta)
 !
       implicit none
 !
@@ -246,7 +246,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Osnes(i,beta,cd)
+      subroutine ppiclf_user_QS_Osnes(i,beta)
 !
       implicit none
 !

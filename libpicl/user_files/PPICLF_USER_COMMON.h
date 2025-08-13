@@ -80,10 +80,6 @@
      >          G1P= -0.2867, G2P=0.2176, G3P=0.2826, G4P=-0.0644,
      >          G5P=0.0466, G6P=0.0973, G7P= -0.0081, G8P=-0.0235
       
-      ! Variables for averaging mean flow quantities
-      real*8 cd_average, v2magmean
-      common /user_fluct04/ cd_average, v2magmean
-
 !
 ! For ppiclf_user_debug.f
 !

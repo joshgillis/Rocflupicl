@@ -330,7 +330,10 @@
          ! TLJ - 04/03/2025; Do not calculate forces if vmag = 0
          !       Otherwise the particles might move before the 
          !       shock arrives
-         if (vmag <= 1.d-8) cycle
+         !if (vmag <= 1.d-8) cycle
+         
+         ! 08/08/2025 - Thierry  - 1.d-8 is very small
+         if (vmag <= 1.d-3) cycle
 
 
          ! Thierry - at initial times when rmachp and vmag are very
@@ -385,7 +388,6 @@
          !--- Added for PseudoTurbulence
          k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
          Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
-         cd_average = 0.0d0; cd = 0.0d0; v2magmean = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -471,18 +473,12 @@
 ! Step 2: Force component quasi-steady
 !
 
-         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
-         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
-         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta)
+         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta)
+         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta)
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
-
-
-         ! Store drag coefficient for calculating Reynolds Subgrid
-         ! Stress of the Eulerian Mean Model
-         !ppiclf_rprop(PPICLF_R_JCD,i) = cd 
-
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
@@ -491,8 +487,9 @@
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
          elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct,
-     >                                      xi_par,xi_perp )
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,
+     >                                      fqsx,fqsy,fqsz)
          endif
 
          ! Add fluctuation part to quasi-steady force
@@ -1331,7 +1328,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Parmar(i,beta,cd)
+      subroutine ppiclf_user_QS_Parmar(i,beta)
 !
       implicit none
 !
@@ -1438,7 +1435,7 @@
 !   Reynolds numbers and volume fractions. 
 !
 !-----------------------------------------------------------------------
-      subroutine ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+      subroutine ppiclf_user_QS_ModifiedParmar(i,beta)
 !
       implicit none
 !
@@ -1558,7 +1555,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Osnes(i,beta,cd)
+      subroutine ppiclf_user_QS_Osnes(i,beta)
 !
       implicit none
 !
@@ -1856,9 +1853,10 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct,
-     >                                      xi_par,xi_perp)
-!
+      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,
+     >                                      fqsx, fqsy, fqsz)
+!                                                    
       implicit none
 !
       include "PPICLF"
@@ -1882,10 +1880,11 @@
       real*8 eunit(3)
 
       integer*4 m
-      real*8 s_par, s_perp, xi_par, xi_perp, R_par, R_perp, cd
+      real*8 s_par, s_perp, xi_par, xi_perp, R_par, R_perp
       real*8 R(3,3), Q(3,3), Qt(3,3) 
-      real*8 denom, eps
+      real*8 denom, eps, CD_average
       real*8 k_Osnes, b_Osnes, b_Mach_t1, b_Mach_t2
+      real*8 fqsx, fqsy, fqsz
 !
 ! Code:
 !
@@ -2095,6 +2094,15 @@
         mp = rmachp
         re = rep
         rem = (1.0-phi)*re
+        
+        ! CD_average is zero at early time steps
+
+        avec = [vx,vy,vz]/vmag
+
+        CD_average = fqsx*avec(1) +
+     >               fqsy*avec(2) +
+     >               fqsz*avec(3)
+
          ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
                                                                        
         ! Reynolds number and vol fraction dependent k^tilde and b_par 
@@ -2108,11 +2116,11 @@
         k_Mach = phi*(C1P + C2P*phi + re**C3P) * 
      >        (tanh(C4P/C5P) + tanh((mp - C4P)/C5P))
         b_Mach = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
-     >         phi*(D4P + D5P*(re/300.0)**2 + D6P*phi)) *
+     >         phi*(D4P + D5P*(re**2/300.0**2) + D6P*phi)) *
      >         (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
 
         b_Mach_t1 = (D1P + (re/300.0)*(D2P + D3P*re/300.0) +
-     >         phi*(D4P + D5P*(re/300.0)**2 + D6P*phi))
+     >         phi*(D4P + D5P*(re**2/300.0**2) + D6P*phi))
         b_Mach_t2 = (tanh(-D7P/D8P) - tanh((mp-D7P)/D8P))
                                                                        
         ! Corrected k^tilde and b_par components                       
@@ -2182,15 +2190,27 @@ c------ ! Lagrangian Model
         xi_perp = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPERP,i)
      >            + bSDE_CL*dW2
 
-        ! CD_frac is dimensionless
-        ! cd is dimensionless ? 
-        ! I need to validate how to divide them
+        ! CD_prime has unit of Force
+        ! CD_average has unit of Force
 
         ! Lagrangian Reynolds Subgrid Stress - Parallel Component
-        R_par = 1.0 + A1P + A2P * CD_frac / cd + xi_par
+        R_par = 1.0 + A1P + A2P * CD_prime / CD_average + xi_par
   
         ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
-        R_perp = 1.0 + A3P * CD_frac / cd + xi_perp
+        R_perp = 1.0 + A3P * CD_prime / CD_average + xi_perp
+
+        if(IsNan(R_par) .or. IsNan(R_perp)) then
+          print*, "R_par =", R_par, "R_perp =", R_perp
+          print*, "CD_average =", CD_average
+          print*, "rprop5(FQSX:FQSZ ,i)",
+     >     ppiclf_rprop5(PPICLF_R_FQSX,i),
+     >     ppiclf_rprop5(PPICLF_R_FQSY,i),
+     >     ppiclf_rprop5(PPICLF_R_FQSZ,i)
+          print*, "avec =", avec
+          print*, "vmag =", vmag
+          print*, "fqsx, fqsy, fqsz =", fqsx, fqsy, fqsz
+          STOP
+        endif
         
 c--  Multiply Lagrangian Model by the Eulerian Mean Model
         R_par  = R_par  * Rmean_par 
@@ -2234,42 +2254,24 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
      >                R_par , R_perp,
      >                xi_par, xi_perp,
      >                s_par, s_perp,
-     >                CD_frac, cd,
+     >                CD_average, tf_inv,
      >                A1P, A2P, A3P,     
-     >                A2P * CD_frac / cd,
-     >                A3P * CD_frac / cd,
+     >                A2P * CD_prime / CD_average,
+     >                A3P * CD_prime / CD_average,
      >                CD_prime,
      >                b_Mach_t1, b_Mach_t2
-        
 
-          write(100,*) ppiclf_time, i,
-     >          R(1,1)+R(2,2)+R(3,3),
-     >          Rsg(1,1)+Rsg(2,2)+Rsg(3,3),
-     >          2.0d0*k_tilde*0.5d0*vmag**2,
-     >          Rmean_par + 2.0d0*Rmean_perp
-         
-         write(101,*) ppiclf_time, i, 
-     >          R_par, Rmean_par, 
-     >          A1P,
-     >          A2P * CD_frac / cd,
-     >          xi_par, s_par, Z1
-
-         write(102,*) ppiclf_time, i,
-     >          R_perp, Rmean_perp,
-     >          A3P * CD_frac / cd,
-     >          xi_perp, s_perp, Z2
 !-------------------------------------------------------------------------
 
         endif
 
         ! storing for plotting - to delete later
-        ppiclf_rprop(PPICLF_R_JCDAverage,i)   = cd
-        ppiclf_rprop(PPICLF_R_JCDFrac,i)     = CD_frac
+        ppiclf_rprop(PPICLF_R_JCDAverage,i)   = CD_average
+        ppiclf_rprop(PPICLF_R_JCDPrime,i)     = CD_prime
         ppiclf_rprop(PPICLF_R_JRSGPar,i)      = R_par
         ppiclf_rprop(PPICLF_R_JRSGPerp,i)     = R_perp
         ppiclf_rprop(PPICLF_R_JRSGParMean,i)  = Rmean_par
         ppiclf_rprop(PPICLF_R_JRSGPerpMean,i) = Rmean_perp
-        ppiclf_rprop(PPICLF_R_JDENUM,i)       = denum
 
       endif ! pseudoTurb_flag
 

@@ -328,7 +328,10 @@
          ! TLJ - 04/03/2025; Do not calculate forces if vmag = 0
          !       Otherwise the particles might move before the 
          !       shock arrives
-         if (vmag <= 1.d-8) cycle
+         !if (vmag <= 1.d-8) cycle
+         
+         ! 08/08/2025 - Thierry  - 1.d-8 is very small
+         if (vmag <= 1.d-3) cycle
 
 
          ! Thierry - at initial times when rmachp and vmag are very
@@ -383,7 +386,6 @@
          !--- Added for PseudoTurbulence
          k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
          Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
-         cd_average = 0.0d0; cd = 0.0d0; v2magmean = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -469,18 +471,12 @@
 ! Step 2: Force component quasi-steady
 !
 
-         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
-         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
-         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta)
+         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta)
+         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta)
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
-
-
-         ! Store drag coefficient for calculating Reynolds Subgrid
-         ! Stress of the Eulerian Mean Model
-         !ppiclf_rprop(PPICLF_R_JCD,i) = cd 
-
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
@@ -489,8 +485,9 @@
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
          elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,cd,fqs_fluct,
-     >                                      xi_par,xi_perp )
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,
+     >                                      fqsx,fqsy,fqsz)
          endif
 
          ! Add fluctuation part to quasi-steady force

@@ -77,12 +77,11 @@
 #define PPICLF_R_XIPERP 54
 ! probably delete below ones later; using them for plotting
 #define PPICLF_R_JCDAverage 46
-#define PPICLF_R_JCDFrac 47
+#define PPICLF_R_JCDPrime 47
 #define PPICLF_R_JRSGPar 48
 #define PPICLF_R_JRSGPerp 49
 #define PPICLF_R_JRSGParMean 50
 #define PPICLF_R_JRSGPerpMean 51
-#define PPICLF_R_JDENUM 52
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 #define PPICLF_R_JRSG11 1
