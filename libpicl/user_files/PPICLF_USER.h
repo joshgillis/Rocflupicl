@@ -1,6 +1,6 @@
 #define PPICLF_LPART 20000
 #define PPICLF_LRS 12
-#define PPICLF_LRP 54
+#define PPICLF_LRP 47
 #define PPICLF_LEE 75000
 #define PPICLF_LEX 2
 #define PPICLF_LEY 2
@@ -73,15 +73,8 @@
 #define PPICLF_R_JSDOX 43
 #define PPICLF_R_JSDOY 44
 #define PPICLF_R_JSDOZ 45
-#define PPICLF_R_XIPAR 53
-#define PPICLF_R_XIPERP 54
-! probably delete below ones later; using them for plotting
-#define PPICLF_R_JCDAverage 46
-#define PPICLF_R_JCDPrime 47
-#define PPICLF_R_JRSGPar 48
-#define PPICLF_R_JRSGPerp 49
-#define PPICLF_R_JRSGParMean 50
-#define PPICLF_R_JRSGPerpMean 51
+#define PPICLF_R_XIPAR 46
+#define PPICLF_R_XIPERP 47
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 #define PPICLF_R_JRSG11 1
@@ -117,7 +110,7 @@
 
 ! map: PPICLF_LRP_PRO
 #define PPICLF_P_JPHIP 1
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 #define PPICLF_P_JFX 2
 #define PPICLF_P_JFY 3
 #define PPICLF_P_JFZ 4

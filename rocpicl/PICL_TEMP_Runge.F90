@@ -974,7 +974,8 @@ endif
 
          ! K_sg = 1/(2*rhof) * tr(Rsg)
          ! K_sg to compare with Total Energy of Fluid
-         pRegion%mixt%piclKsg = 1.0_RFREAL/(2.0_RFREAL*pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)) &
+         pRegion%mixt%piclKsg = 1.0_RFREAL/(2.0_RFREAL* &
+                      (pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)/(1.0_RFREAL - PhiP(:))))&
                                 * (JRSGCell(1,:) + JRSGCell(5,:) + JRSGCell(9,:))
 
        if(global%piclPseudoTurbFlag .eq. 1) then

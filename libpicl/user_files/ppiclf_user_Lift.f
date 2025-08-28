@@ -52,6 +52,9 @@
 ! Valid for Rep < 50 and omg* < 0.8 (see Loft, "Lift of a spherical
 !    particle subject to vorticity and/or spin", AIAA J., 
 !    Vol. 46,  pp. 801-809, 2008)
+!      
+! References:
+! 1) Fundamentals of Dispersed Multiphase Flows (S.Balachandar), Chap.5
 !
 !-----------------------------------------------------------------------
 !
@@ -118,7 +121,12 @@
 ! Subroutine for Magnus lift - lift induced by particle rotation
 !
 ! Requires particle angular velocity to be calculated
-!
+!      
+! References:
+! 1) Fundamentals of Dispersed Multiphase Flows (S.Balachandar), Chap.5
+! 2) Loth and Drogan, "An equation of motion for particles of finite
+! Reynolds number and size", (2009). 
+!      
 !-----------------------------------------------------------------------
 !
       subroutine Lift_Magnus(i,liftx,lifty,liftz)

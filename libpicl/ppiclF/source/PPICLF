@@ -1,12 +1,11 @@
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor
@@ -14,7 +13,7 @@ c Computational particles
       REAL*8 PPICLF_Y (12 ,20000) ! Solution
      > ,PPICLF_YDOT (12 ,20000) ! Total solution RHS
      > ,PPICLF_YDOTC (12 ,20000) ! Coupled solution RHS
-     > ,PPICLF_RPROP (54 ,20000) ! Real particle properties
+     > ,PPICLF_RPROP (47 ,20000) ! Real particle properties
      > ,PPICLF_RPROP2(4,20000) ! Secondary real particle properties
      > ,PPICLF_RPROP3(6*5,20000) ! Third real particle properties
      > ,PPICLF_RPROP4(9,20000) ! Fourth real particle properties
@@ -44,12 +43,11 @@ c Previous time step solutions, may grow later
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor
@@ -102,12 +100,11 @@ C Grid
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor
@@ -142,12 +139,11 @@ c Particle options
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor
@@ -181,8 +177,8 @@ c Bins
       COMMON /PPICLF_PARALLEL_BIN_LOCAL_N/ PPICLF_BX, PPICLF_BY
      > ,PPICLF_BZ
 C Ghost particles
-      REAL*8 PPICLF_RPROP_GP(12 +54 +19,26*20000)
-     > ,PPICLF_CP_MAP(12 +54 +19,20000)
+      REAL*8 PPICLF_RPROP_GP(12 +47 +19,26*20000)
+     > ,PPICLF_CP_MAP(12 +47 +19,20000)
       COMMON /PPICLF_PARALLEL_GHOST_R/ PPICLF_RPROP_GP, PPICLF_CP_MAP
       INTEGER*4 PPICLF_NB_R(3,20000)
      > ,PPICLF_NB_G(3,26*20000)
@@ -194,12 +190,11 @@ C Ghost particles
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor
@@ -247,30 +242,6 @@ C Ghost particles
       common /user_fluct03/ u2pmean, v2pmean, w2pmean
       real*8 UnifRnd(6), Rsg(3,3)
       common /user_fluct02/ UnifRnd, Rsg
-      real*8 k_tilde, k_Mach, b_tilde,
-     > b_Mach, b_par, b_perp,
-     > Rmean_par, Rmean_perp
-      common /user_fluct03/ k_tilde, k_Mach,
-     > b_Mach, b_par, b_perp,
-     > Rmean_par, Rmean_perp
-      real*8 C1P, C2P, C3P, C4P, C5P,
-     > D1P, D2P, D3P, D4P, D5P, D6P, D7P, D8P,
-     > E1P, E2P, E3P, E4P
-      real*8 F1P, F2P, F3P, F4P, F5P, F6P, F7p, F8P, F9P, F10P, F11P,
-     > G1P, G2P, G3P, G4P, G5P, G6P, G7P, G8P,
-     > A1P, A2P, A3P
-      ! Constants taken from Osnes PseudoTurbulent paper, Table 1
-      parameter C1P = -1.2152, C2P = -7.6314, C3P=0.2889, C4P=0.6143,
-     > C5P = 0.3082,
-     > D1P = -0.0462, D2P = -0.1068, D3P=0.6793, D4P=1.1461,
-     > D5P = -2.6886, D6P = -2.1376, D7P=0.4873, D8P=0.2395,
-     > E1P = -0.2906, E2P=1.1899, E3P=0.5218, E4P=0.0699
-      ! Constants taken from Osnes PseudoTurbulent paper, Table 2
-      parameter F1P= -0.0022, F2P= -0.0219, F3P=0.0932, F4P= -0.0135,
-     > F5P=0.0361, F6P=0.0403, F7P= -0.0761, F8P = 0.0599,
-     > F9P=0.0164, F10P=0.0453, F11P= -0.0265,
-     > G1P= -0.2867, G2P=0.2176, G3P=0.2826, G4P=-0.0644,
-     > G5P=0.0466, G6P=0.0973, G7P= -0.0081, G8P=-0.0235
 !
 ! For ppiclf_user_debug.f
 !
@@ -328,12 +299,11 @@ C Ghost particles
 ! number of timesteps kept in history kernels
 ! maximum number of triangular patch boundaries
 ! y, y1, ydot, ydotc: 12
-! rprop: 54
-! probably delete below ones later; using them for plotting
+! rprop: 47
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 ! map: 19
-!--- x,y,z Forces to Rocflu
+!--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms
 !--- Reynolds Subgrid Stress Tensor

@@ -384,8 +384,7 @@
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
          !--- Added for PseudoTurbulence
-         k_tilde=0.0d0; b_par=0.0d0; k_Mach=0.0d0; b_Mach=0.0d0  
-         Rmean_par=0.0d0; Rmean_perp=0.0d0; Rsg = 0.0d0
+         Rsg = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -487,7 +486,7 @@
          elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
             call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
      >                                      xi_par,xi_perp,
-     >                                      fqsx,fqsy,fqsz)
+     >                                      fqsx, fqsy, fqsz)
          endif
 
          ! Add fluctuation part to quasi-steady force
@@ -709,8 +708,6 @@
       ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
       ! We need to store the tensor calculations here in a certain array and then
       ! access that in the mapping subroutine for when projection is needed
-      ! I tried accessing the array from the mapping subroutine directly but there 
-      ! was a mismatch in values with the exact simulation time
 
             ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
             ppiclf_rprop4(PPICLF_R_JRSG12,i) = Rsg(1,2)
