@@ -462,10 +462,16 @@ SUBROUTINE RFLU_DeallocateMemorySolCv(pRegion)
     DEALLOCATE(pRegion%mixt%piclVFg,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclgradRhog,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclPhiRSG,STAT=errorFlag)
-    DEALLOCATE(pRegion%mixt%piclgradPhiRSG,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclGradPhiRSG,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclDivPhiRSG,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclJF,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclKsg,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclQsg,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclPhiQsg,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclGradPhiQsg,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclDivPhiQsg,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclRhsEnergy,STAT=errorFlag)
+    DEALLOCATE(pRegion%mixt%piclRhsMom,STAT=errorFlag)
     ! 03/19/2025 - Thierry - ends here 
     global%error = errorFlag
     IF (global%error /= ERR_NONE) THEN

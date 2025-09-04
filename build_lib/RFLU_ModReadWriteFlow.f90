@@ -2675,6 +2675,9 @@ MODULE RFLU_ModReadWriteFlow
       ! 03/20/2025 - Thierry - begins here
       WRITE(iFile) (pRegion%mixt%piclgradRhog(:,1,j),j=1,pGrid%nCellsTot)
       WRITE(iFile) (pRegion%mixt%piclDivPhiRSG(:,j),j=1,pGrid%nCells)
+      WRITE(iFile) (pRegion%mixt%piclDivPhiQsg(j),j=1,pGrid%nCells)
+      WRITE(iFile) (pRegion%mixt%piclRhsEnergy(j),j=1,pGrid%nCells)
+      WRITE(iFile) (pRegion%mixt%piclRhsMom(:,j),j=1,pGrid%nCells)
       WRITE(iFile) (pRegion%mixt%piclJF(:,j),j=1,pGrid%nCells)
       WRITE(iFile) (pRegion%mixt%piclKsg(j),j=1,pGrid%nCells)
       ! 03/20/2025 - Thierry - ends here
@@ -2707,7 +2710,7 @@ MODULE RFLU_ModReadWriteFlow
     CLOSE(iFile,IOSTAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_FILE_CLOSE,2751,iFileName)
+      CALL ErrorStop(global,ERR_FILE_CLOSE,2754,iFileName)
     END IF ! global%error
 
 ! ******************************************************************************
@@ -2765,17 +2768,18 @@ MODULE RFLU_ModReadWriteFlow
 
 ! y, y1, ydot, ydotc: 12
 
-! rprop: 47
+! rprop: 48
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 
-! map: 19
+! map: 22
 !--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms 
 !--- Reynolds Subgrid Stress Tensor
+!--- Pseudo Turbulent Kinetic Energy
 
 
 
@@ -3036,6 +3040,14 @@ MODULE RFLU_ModReadWriteFlow
          varX=pRegion%mixt%piclDivPhiRSG(1,1:Ne), &
          varY=pRegion%mixt%piclDivPhiRSG(2,1:Ne), &
          varZ=pRegion%mixt%piclDivPhiRSG(3,1:Ne))
+    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Div Phi QSG', &
+         var=pRegion%mixt%piclDivPhiQsg(1:Ne))
+    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Rhs Energy', &
+         var=pRegion%mixt%piclRhsEnergy(1:Ne))
+    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Rhs Mom', &
+         varX=pRegion%mixt%piclRhsMom(1,1:Ne), &
+         varY=pRegion%mixt%piclRhsMom(2,1:Ne), &
+         varZ=pRegion%mixt%piclRhsMom(3,1:Ne))
     E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Feedback Force', &
          varX=pRegion%mixt%piclJF(1,1:Ne), &
          varY=pRegion%mixt%piclJF(2,1:Ne), &
@@ -3145,6 +3157,9 @@ MODULE RFLU_ModReadWriteFlow
                                                                tp='Float64' )
       ! 03/20/2025 - Thierry - ends here
       E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Div Phi RSG', tp='Float64' )
+      E_IO = PVTK_VAR_XML(varname = 'Div Phi QSG', tp='Float64' )
+      E_IO = PVTK_VAR_XML(varname = 'Rhs Energy', tp='Float64' )
+      E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Rhs Mom', tp='Float64' )
       E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Feedback Force', tp='Float64' )
       E_IO = PVTK_VAR_XML(varname = 'Ksg', tp='Float64')
   END IF
@@ -3563,7 +3578,7 @@ END IF
          IOSTAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
-      CALL ErrorStop(global,ERR_FILE_OPEN,3951,iFileName)
+      CALL ErrorStop(global,ERR_FILE_OPEN,3965,iFileName)
     END IF ! global%error
 
     END IF
@@ -3650,7 +3665,7 @@ END IF
       CLOSE(iFile,IOSTAT=errorFlag)
       global%error = errorFlag
       IF ( global%error /= ERR_NONE ) THEN
-        CALL ErrorStop(global,ERR_FILE_CLOSE,4072,iFileName)
+        CALL ErrorStop(global,ERR_FILE_CLOSE,4086,iFileName)
       END IF ! global%error
     END IF ! masterproc
 
@@ -3752,7 +3767,7 @@ END IF
          CALL RFLU_PICL_WriteFlowBinary(pRegion)
         END IF
       ELSE
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4194)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4208)
       END IF ! global%solutFormat
 
 ! ******************************************************************************
@@ -3783,7 +3798,7 @@ END IF
           CALL SPEC_RFLU_WriteEEvBinary(pRegion)
         END IF ! pRegion%specInput%nSpeciesEE
       ELSE
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4254)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4268)
       END IF ! global%solutFormat
     END IF ! global%specUsed
 

@@ -1,12 +1,12 @@
 #define PPICLF_LPART 20000
 #define PPICLF_LRS 12
-#define PPICLF_LRP 47
+#define PPICLF_LRP 48
 #define PPICLF_LEE 75000
 #define PPICLF_LEX 2
 #define PPICLF_LEY 2
 #define PPICLF_LEZ 2
 #define PPICLF_LRP_INT 30
-#define PPICLF_LRP_PRO 19
+#define PPICLF_LRP_PRO 22
 
 ! number of timesteps kept in history kernels
 #define PPICLF_VU 5
@@ -75,6 +75,7 @@
 #define PPICLF_R_JSDOZ 45
 #define PPICLF_R_XIPAR 46
 #define PPICLF_R_XIPERP 47
+#define PPICLF_R_XIT 48
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 #define PPICLF_R_JRSG11 1
@@ -86,6 +87,9 @@
 #define PPICLF_R_JRSG31 7
 #define PPICLF_R_JRSG32 8
 #define PPICLF_R_JRSG33 9
+#define PPICLF_R_JTSG1 10
+#define PPICLF_R_JTSG2 11
+#define PPICLF_R_JTSG3 12
 
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 #define PPICLF_R_FQSX 1
@@ -132,3 +136,7 @@
 #define PPICLF_P_JRSG31 17
 #define PPICLF_P_JRSG32 18
 #define PPICLF_P_JRSG33 19
+!--- Pseudo Turbulent Kinetic Energy
+#define PPICLF_P_JTSG1 20
+#define PPICLF_P_JTSG2 21
+#define PPICLF_P_JTSG3 22

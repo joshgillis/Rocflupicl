@@ -196,7 +196,7 @@
 !-----------------------------------------------------------------------
 !
       subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
-     >                                      xi_par,xi_perp,
+     >                                      xi_par,xi_perp,xi_T,
      >                                      fqsx,fqsy,fqsz)
 !                                                    
       implicit none
@@ -208,15 +208,15 @@
       real*8 fqsx, fqsy, fqsz
 !
 ! Output:
-      real*8 xi_par, xi_perp
+      real*8 xi_par, xi_perp, xi_T
       real*8 fqs_fluct(3)
 !
 ! Internal:
 !
-      real*8 aSDE,bq,chi,denum,dW1,dW2,fq,Fs,gkern,
-     >   sigD,tF_inv,theta,upflct,vpflct,wpflct,Z1,Z2
+      real*8 aSDE,bq,chi,denum,dW1,dW2,dW3,fq,Fs,gkern,
+     >   sigD,tF_inv,theta,upflct,vpflct,wpflct,Z1,Z2,Z3
       real*8 TwoPi
-      real*8 bSDE_CD, bSDE_CL,CD_frac,CD_prime
+      real*8 bSDE_CD, bSDE_CL, bSDE_CT, CD_frac, CD_prime
       real*8 sigT,sigCT
       real*8 sigmoid_cf, f_CF
       real*8 avec(3)
@@ -227,8 +227,8 @@
       real*8 eunit(3)
 
       integer*4 m
-      real*8 s_par, s_perp, Rmean_par, Rmean_perp, R_par, R_perp
-      real*8 R(3,3), Q(3,3), Qt(3,3) 
+      real*8 s_par, s_perp, s_T, Rmean_par, Rmean_perp, R_par, R_perp
+      real*8 R(3,3), Q(3,3), Qt(3,3), Tmean_par(3)
       real*8 CD_average
       real*8 k_tilde, k_Mach, b_tilde, b_Mach, b_par, b_perp,
      >       k_Osnes, b_Osnes
@@ -237,7 +237,8 @@
      >       E1, E2, E3, E4
       real*8 F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11,
      >       G1, G2, G3, G4, G5, G6, G7, G8,
-     >       A1, A2, A3
+     >       H1, H2, H3, H4, H5, H6, H7, H8,
+     >       A1, A2, A3, A4
       real*8 D9, D10, D11
       real*8 fit_func
 !
@@ -468,18 +469,19 @@
                       D11 =  1.6
 
       ! Constants taken from Osnes PseudoTurbulent paper, Table 2
-        F1  = -0.0022; G1 = -0.2867;
-        F2  = -0.0219; G2 =  0.2176;
-        F3  =  0.0932; G3 =  0.2826;
-        F4  = -0.0135; G4 = -0.0644;
-        F5  =  0.0361; G5 =  0.0466;
-        F6  =  0.0403; G6 =  0.0973;
-        F7  = -0.0761; G7 = -0.0081;
-        F8  =  0.0599; G8 = -0.0235;
-        F9  =  0.0164; 
-        F10 =  0.0453; 
+        F1  = -0.0022; G1 = -0.2867; H1 =  0.4992
+        F2  = -0.0219; G2 =  0.2176; H2 = -1.3528
+        F3  =  0.0932; G3 =  0.2826; H3 = -0.1358
+        F4  = -0.0135; G4 = -0.0644; H4 = -0.1463
+        F5  =  0.0361; G5 =  0.0466; H5 =  0.2583
+        F6  =  0.0403; G6 =  0.0973; H6 = -0.3339
+        F7  = -0.0761; G7 = -0.0081; H7 = -0.0407
+        F8  =  0.0599; G8 = -0.0235; H8 = -0.0806
+        F9  =  0.0164;
+        F10 =  0.0453;
         F11 = -0.0265;
      
+        Tmean_par = 0.0d0 ! zero out variable first
         
         ! CD_average is zero at early time steps
 
@@ -533,10 +535,18 @@
                                                                        
         ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
         Rmean_perp = 2.0d0*k_Osnes*(b_perp + 1.0d0/3.0d0)
+
+        ! Mean Pseudo Turbulent Kinetic Energy Model
+        Tmean_par = E1 + E2*phi/(E3 + re/300.0) + E4*mp
         
 c--  Multiply by the mean relative flow kinetic energy to dimentionalize      
         Rmean_par  = Rmean_par  * 0.5d0 * vmag**2
         Rmean_perp = Rmean_perp * 0.5d0 * vmag**2
+
+c--  Multiply by the mean relative velocity & flow kinetic energy to dimentionalize      
+        Tmean_par(1)  = Tmean_par(1) * vx * k_Osnes * 0.5d0 * vmag**2
+        Tmean_par(2)  = Tmean_par(2) * vy * k_Osnes * 0.5d0 * vmag**2
+        Tmean_par(3)  = Tmean_par(3) * vz * k_Osnes * 0.5d0 * vmag**2
 
 c------ Lagrangian Model
   
@@ -545,16 +555,27 @@ c------ Lagrangian Model
         A2 = 0.064
 
         A3 = G1 + G2/(min(phi,0.3) + G3) + G4 * mp
+        
+        ! 09/02/2025 - Cap according to Osnes model range
+        A4 = H1 + H2*max(0.0d0, min(0.3d0, phi))
+     >          + H3*max(0.0d0, min(0.87d0, mp)) 
+     >          + H4*max(30.0d0, min(266.0d0, re))/300.0d0
   
         s_par = F8 + F9/(phi + F10) + F11 * mp
         !s_perp = G5/(phi + G6) + (G7*re)/(300.0*phi) + G8
 c---     We ditch Osnes's expression for s_perp and assume it as big as s_par
         s_perp = s_par
+        
+        ! 09/02/2025 - Cap according to Osnes model range
+        s_T = H5 + H6*max(0.0d0, min(0.3d0, phi))
+     >           + H7*max(0.0d0, min(0.87d0, mp)) 
+     >           + H8*max(30.0d0, min(266.0d0, re))/300.0d0
 
         tF_inv = (24.0*phi*chi/dp) * sqrt(theta/rpi)
         aSDE = tF_inv
         bSDE_CD = s_par *sqrt(2.0*tF_inv)
         bSDE_CL = s_perp*sqrt(2.0*tF_inv)
+        bSDE_CT = s_T *sqrt(2.0*tF_inv)
   
         call RANDOM_NUMBER(UnifRnd)
         
@@ -563,16 +584,20 @@ c---     We ditch Osnes's expression for s_perp and assume it as big as s_par
         ! Z1 & Z2 are standard normal random variables
         Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
         Z2 = sqrt(-2.0d0*log(UnifRnd(3))) * sin(TwoPi*UnifRnd(4))
+        Z3 = sqrt(-2.0d0*log(UnifRnd(5))) * cos(TwoPi*UnifRnd(6))
 
         ! dW1 & dW2 are scaled stochastic amplitudes       
         dW1 = sqrt(fac)*Z1
         dW2 = sqrt(fac)*Z2
+        dW3 = sqrt(fac)*Z3
   
-        ! Langevin Model implemented for xi_par and xi_perp
+        ! Langevin Model implemented for xi_par, xi_perp, xi_T
         xi_par = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPAR,i)
      >            + bSDE_CD*dW1
         xi_perp = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPERP,i)
      >            + bSDE_CL*dW2
+        xi_T = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIT,i)
+     >            + bSDE_CT*dW3
 
         ! CD_prime has unit of Force
         ! CD_average has unit of Force
@@ -622,6 +647,20 @@ c---  R matrix only has diagonal components
 c--- Now Rotate the matrix, Rsg = Q . R . Q^T
   
        Rsg = matmul(Q, matmul(R,Qt))
+
+c--- Osnes Formulation for PTKE
+       T_par = A4 * CD_prime/CD_average + xi_T
+
+c--  Multiply by the mean relative velocity & flow kinetic energy to dimentionalize      
+c--  then add mean PTKE
+       T_par(1) = T_par(1) * vx * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(1)
+
+       T_par(2) = T_par(2) * vy * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(2)
+
+       T_par(3) = T_par(3) * vz * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(3)
        
 !       if(iStage .eq. 3 .and. i<= 5) then
 !         write(90+i, *) ppiclf_time, re, mp, phi,

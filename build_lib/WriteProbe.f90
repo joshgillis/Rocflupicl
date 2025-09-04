@@ -102,17 +102,18 @@ SUBROUTINE WriteProbe( regions,iReg )
 
 ! y, y1, ydot, ydotc: 12
 
-! rprop: 47
+! rprop: 48
 
 ! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
 
 ! rprop5: PPICLF_LRP5 - Storing Force Models
 
-! map: 19
+! map: 22
 !--- x,y,z Forces Fedback to Rocflu
 !---
 !--- Add comment about these terms 
 !--- Reynolds Subgrid Stress Tensor
+!--- Pseudo Turbulent Kinetic Energy
 
 
 

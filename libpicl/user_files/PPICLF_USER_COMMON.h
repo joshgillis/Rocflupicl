@@ -49,8 +49,8 @@
       common /user_fluct02/ upmean, vpmean, wpmean, phipmean
       common /user_fluct03/ u2pmean, v2pmean, w2pmean
 
-      real*8 UnifRnd(6), Rsg(3,3)
-      common /user_fluct02/ UnifRnd, Rsg
+      real*8 UnifRnd(6), Rsg(3,3), T_par(3)
+      common /user_fluct02/ UnifRnd, Rsg, T_par
 
 !
 ! For ppiclf_user_debug.f

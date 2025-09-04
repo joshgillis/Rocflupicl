@@ -54,7 +54,7 @@
       real*8 fqsx, fqsy, fqsz
       real*8 fqsforce
       real*8 fqs_fluct(3)
-      real*8 xi_par, xi_perp
+      real*8 xi_par, xi_perp, xi_T
       real*8 famx, famy, famz 
       real*8 fdpdx, fdpdy, fdpdz
       real*8 fdpvdx, fdpvdy, fdpvdz
@@ -384,7 +384,7 @@
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
          !--- Added for PseudoTurbulence
-         Rsg = 0.0d0
+         Rsg = 0.0d0; T_par = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -485,7 +485,7 @@
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
          elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
             call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
-     >                                      xi_par,xi_perp,
+     >                                      xi_par,xi_perp,xi_T,
      >                                      fqsx, fqsy, fqsz)
          endif
 
@@ -502,6 +502,7 @@
          ! Store normally distributed random variables xi for PseudoTurbulence
          ppiclf_rprop(PPICLF_R_XIPAR,i)  = xi_par
          ppiclf_rprop(PPICLF_R_XIPERP,i) = xi_perp
+         ppiclf_rprop(PPICLF_R_XIT,i) = xi_T
 
 !
 ! Step 4: Force component added mass
@@ -695,6 +696,15 @@
      >         (ppiclf_ydot(PPICLF_JVZ,i)*rmass - fcz)
 
             ! Energy equation feedback term
+            if(pseudoTurb_flag==1) then
+            ! 09/02/2025 -  Addition of PTKE to Rocflu's Energy Equation
+              ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i)*
+     >         ( (fqsx+fvux+famx+liftx)*ppiclf_y(PPICLF_JVX,i) + 
+     >           (fqsy+fvuy+famy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
+     >           (fqsz+fvuz+famz+liftz)*ppiclf_y(PPICLF_JVZ,i) +
+     >           qq )
+
+            else ! Pseudo Turbulence is OFF
             ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i) *
      >         ( (fqsx+fvux)*ppiclf_y(PPICLF_JVX,i) + 
      >           (fqsy+fvuy)*ppiclf_y(PPICLF_JVY,i) + 
@@ -703,7 +713,9 @@
      >                  famy*ppiclf_rprop(PPICLF_R_JUY,i) +
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
      >           qq )
+
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
+            endif ! pseudoTurb_flag
 
       ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
       ! We need to store the tensor calculations here in a certain array and then
@@ -718,6 +730,10 @@
             ppiclf_rprop4(PPICLF_R_JRSG31,i) = Rsg(3,1)
             ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
             ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
+            
+            ppiclf_rprop4(PPICLF_R_JTSG1,i) = T_par(1)
+            ppiclf_rprop4(PPICLF_R_JTSG2,i) = T_par(2)
+            ppiclf_rprop4(PPICLF_R_JTSG3,i) = T_par(3)
             
          endif ! feedback_flag
 
