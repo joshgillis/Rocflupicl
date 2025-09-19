@@ -97,16 +97,16 @@ END FUNCTION MixtPerf_T_CpHoVm2
 
 !------------------------------------------------------------------------------
 
-FUNCTION MixtPerf_T_CvEoVm2(Cv,Eo,Vm2)
+FUNCTION MixtPerf_T_CvEoVm2(Cv,Eo,Vm2,KSG)
 
   USE ModDataTypes
 
   IMPLICIT NONE
   
-  REAL(RFREAL), INTENT(IN) :: Cv,Eo,Vm2
+  REAL(RFREAL), INTENT(IN) :: Cv,Eo,Vm2,KSG
   REAL(RFREAL) :: MixtPerf_T_CvEoVm2
    
-  MixtPerf_T_CvEoVm2 = (Eo-0.5_RFREAL*Vm2)/Cv
+  MixtPerf_T_CvEoVm2 = (Eo-0.5_RFREAL*Vm2 - KSG)/Cv
 
 END FUNCTION MixtPerf_T_CvEoVm2
 

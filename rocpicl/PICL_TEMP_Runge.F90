@@ -194,6 +194,7 @@ TYPE(t_grid), POINTER :: pGrid
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: rhog
   REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: ugas
   INTEGER(KIND=4) :: j
+  REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: DivPhiQsg
 !---------------------------------------------------------------  
 
   ! TLJ - added for Feedback term - 04/01/2025
@@ -594,6 +595,13 @@ TYPE(t_grid), POINTER :: pGrid
     IF ( global%error /= ERR_NONE ) THEN
       CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
     END IF ! global%error
+
+    ALLOCATE(DivPhiQsg(nCells),STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
 !---------------------------------------------------------------  
 
 
@@ -901,6 +909,9 @@ IF (global%piclFeedbackFlag == 1) THEN
        JRSGCell(:,i) = 0.0_RFREAL
        DivPhiRSG(:,i) = 0.0_RFREAL
 
+       JTSGCell(:,i) = 0.0_RFREAL
+       DivPhiQsg(i) = 0.0_RFREAL
+
        do lz=1,2
        do ly=1,2
        do lx=1,2 
@@ -1000,7 +1011,7 @@ endif
 IF (ANY(IsNan(JTSGCell(:,i))) .EQV. .TRUE.) THEN
         write(*,*) "BROKEN-TSG",i,JTSGCell(:,i)
         write(*,*) "pregionvol", pregion%grid%vol(i)
-        CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken Reynolds SG')
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken TSG')
 endif
 
         pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
@@ -1018,67 +1029,79 @@ endif
         pRegion%mixt%rhs(CV_MIXT_ENER,i) &
                          = pRegion%mixt%rhs(CV_MIXT_ENER,i) &
                          + energydotg
-    END DO ! pRegion%grid%nCells
+
 !---------------------------------------------------------------------------------------
 ! Thierry - now we need to compute the interpolated Reynolds Stress components before
 !           projecting them back.
 !---------------------------------------------------------------------------------------
          ! Temporarily storing the values in an array for plotting and viewing in ParaView
          ! I should probably delete that later
-         pRegion%mixt%piclJF(1,:) = JFXCell(:)
-         pRegion%mixt%piclJF(2,:) = JFYCell(:)
-         pRegion%mixt%piclJF(3,:) = JFZCell(:)
-
-         do j=1,9
-           ! R_sg -> phi_g rho_g R_sg
-           JRSGCell(j,:) = JRSGCell(j,:) * pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)
-         end do
+         pRegion%mixt%piclJF(1,i) = JFXCell(i)
+         pRegion%mixt%piclJF(2,i) = JFYCell(i)
+         pRegion%mixt%piclJF(3,i) = JFZCell(i)
 
          ! Conservative to primitive variables
-         rhog = pRegion%mixt%cv(CV_MIXT_DENS,1:nCells) / (1.0_RFREAL - PhiP(:))
-         ugas(XCOORD,:) = pRegion%mixt%cv(CV_MIXT_XMOM,1:nCells)&
-                          /pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)
+         rhog(i) = pRegion%mixt%cv(CV_MIXT_DENS,i) / (1.0_RFREAL - PhiP(i))
+         ugas(XCOORD,i) = pRegion%mixt%cv(CV_MIXT_XMOM,i)&
+                          /pRegion%mixt%cv(CV_MIXT_DENS,i)
 
-         ugas(YCOORD,:) = pRegion%mixt%cv(CV_MIXT_YMOM,1:nCells)&
-                          /pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)
+         ugas(YCOORD,i) = pRegion%mixt%cv(CV_MIXT_YMOM,i)&
+                          /pRegion%mixt%cv(CV_MIXT_DENS,i)
 
-         ugas(ZCOORD,:) = pRegion%mixt%cv(CV_MIXT_ZMOM,1:nCells)&
-                        /pRegion%mixt%cv(CV_MIXT_DENS,1:nCells)
+         ugas(ZCOORD,i) = pRegion%mixt%cv(CV_MIXT_ZMOM,i)&
+                        /pRegion%mixt%cv(CV_MIXT_DENS,i)
 
-         ! K_sg = 1/(2*rhof) * tr(Rsg)
+         do j=1,9
+           ! R_sg -> rho_g R_sg
+           JRSGCell(j,i) = JRSGCell(j,i) * rhog(i)
+         end do
+
+         ! K_sg = 1/(2*rhof) * tr(Rsg), dimension of (nCellsTot)
          ! K_sg to compare with Total Energy of Fluid
-         pRegion%mixt%piclKsg = 1.0_RFREAL/(2.0_RFREAL*rhog) &
-                                * (JRSGCell(1,:) + JRSGCell(5,:) + JRSGCell(9,:))
+!         pRegion%mixt%piclKsg(i) = 1.0_RFREAL/(2.0_RFREAL*rhog(i)) &
+!                                * (JRSGCell(1,i) + JRSGCell(5,i) + JRSGCell(9,i))
 
+         pRegion%mixt%piclKsg(i) = 0.0_RFREAL
 !===========================================================================================                              
 ! 08/28/2025 - Thierry - Adding Subgrid Energy Flux from Osnes's model
 ! Q_sg : Subgrid Energy Flux dimension (3, nCells)
 
-         !Qsg = rhoF(Cp*ufluct*TOsnes + Tmean - ug*Ksg)
+         !Qsg = rhog*Tsg + ug.Rsg
          ! cp = pRegion%mixt%gv(GV_MIXT_CP,indCp*1:nCells)
          
-         pRegion%mixt%piclQsg(XCOORD,:) = rhog*JTSGCell(XCOORD,:) +   &
-       (JRSGCell(1,:)*ugas(XCOORD,:) + JRSGCell(2,:)*ugas(YCOORD,:) + JRSGCell(3,:)*ugas(ZCOORD,:))
+         pRegion%mixt%piclQsg(XCOORD,i) = rhog(i)*JTSGCell(XCOORD,i) +   &
+       (JRSGCell(1,i)*ugas(XCOORD,i) + JRSGCell(2,i)*ugas(YCOORD,i) + JRSGCell(3,i)*ugas(ZCOORD,i))
 
-         pRegion%mixt%piclQsg(YCOORD,:) = rhog*JTSGCell(YCOORD,:) +   & 
-       (JRSGCell(4,:)*ugas(XCOORD,:) + JRSGCell(5,:)*ugas(YCOORD,:) + JRSGCell(6,:)*ugas(ZCOORD,:))
+         pRegion%mixt%piclQsg(YCOORD,i) = rhog(i)*JTSGCell(YCOORD,i) +   & 
+       (JRSGCell(4,i)*ugas(XCOORD,i) + JRSGCell(5,i)*ugas(YCOORD,i) + JRSGCell(6,i)*ugas(ZCOORD,i))
 
-         pRegion%mixt%piclQsg(ZCOORD,:) = rhog*JTSGCell(ZCOORD,:) +   &
-       (JRSGCell(7,:)*ugas(XCOORD,:) + JRSGCell(8,:)*ugas(YCOORD,:) + JRSGCell(9,:)*ugas(ZCOORD,:))
-
-!===========================================================================================                              
-       if(global%piclPseudoTurbFlag .eq. 1) then
+         pRegion%mixt%piclQsg(ZCOORD,:) = rhog(i)*JTSGCell(ZCOORD,i) +   &
+       (JRSGCell(7,i)*ugas(XCOORD,i) + JRSGCell(8,i)*ugas(YCOORD,i) + JRSGCell(9,i)*ugas(ZCOORD,i))
 
          ! Storing for ParaView plotting
          do j=1,9
-           ! \phi_g R_sg
-           pRegion%mixt%piclPhiRSG(j,:) = JRSGCell(j,:)
+           ! \phi_g \rho_g R_sg
+           pRegion%mixt%piclPhiRSG(j,i) = JRSGCell(j,i) * (1.0_RFREAL - PhiP(i))
          end do
 
          do j=1,3
            ! Q_sg -> \phi_g Q_sg
-           pRegion%mixt%piclPhiQsg(j,:) = pRegion%mixt%piclQsg(j,:) * (1.0_RFREAL - PhiP(:))
+           pRegion%mixt%piclPhiQsg(j,i) = pRegion%mixt%piclQsg(j,i) * (1.0_RFREAL - PhiP(i))
          enddo
+
+         IF (ANY(IsNan(pRegion%mixt%piclPhiQsg(:,i))) .EQV. .TRUE.) THEN
+                 write(*,*) "BROKEN piclPhiQsg", i, pRegion%mixt%piclPhiQsg(:,i)
+                 write(*,*) "rhog(i), ugas(1:3,i)", rhog(i), ugas(1:3,i)
+                 write(*,*) "JTSGCell(1:3,i) ", JTSGCell(1:3,i)
+                 write(*,*) "JRSGCell(1:9,i)", JRSGCell(:,i)
+                 CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken PhiQSG')
+         ENDIF
+
+
+!===========================================================================================                              
+    END DO ! pRegion%grid%nCells
+
+       if(global%piclPseudoTurbFlag .eq. 1) then
 
          ALLOCATE(varInfoPicl(9),STAT=errorFlag)
          ALLOCATE(piclcvInfo(9),STAT=errorFlag)
@@ -1131,61 +1154,86 @@ endif
 ! y-direction: Div(\phi_g R_sg),y = (\phi R_21),1 + (\phi R_22),2 + (\phi R_23),3
 ! z-direction: Div(\phi_g R_sg),z = (\phi R_31),1 + (\phi R_32),2 + (\phi R_33),3
 
-         DivPhiRSG(XCOORD,:) = pRegion%mixt%piclGradPhiRSG(XCOORD,1,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(YCOORD,2,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,3,1:nCells)
+    DO i = 1,pRegion%grid%nCells
+         DivPhiRSG(XCOORD,i) = pregion%grid%vol(i)*(                   &
+                               pRegion%mixt%piclGradPhiRSG(XCOORD,1,i) &
+                             + pRegion%mixt%piclGradPhiRSG(YCOORD,2,i) &
+                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,3,i))
 
-         DivPhiRSG(YCOORD,:) = pRegion%mixt%piclGradPhiRSG(XCOORD,4,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(YCOORD,5,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,6,1:nCells)
+         DivPhiRSG(YCOORD,i) = pregion%grid%vol(i)*(           &
+                               pRegion%mixt%piclGradPhiRSG(XCOORD,4,i) &
+                             + pRegion%mixt%piclGradPhiRSG(YCOORD,5,i) &
+                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,6,i))
 
-         DivPhiRSG(ZCOORD,:) = pRegion%mixt%piclGradPhiRSG(XCOORD,7,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(YCOORD,8,1:nCells) &
-                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,9,1:nCells)
+         DivPhiRSG(ZCOORD,i) = pregion%grid%vol(i)*(            &
+                               pRegion%mixt%piclGradPhiRSG(XCOORD,7,i) &
+                             + pRegion%mixt%piclGradPhiRSG(YCOORD,8,i) &
+                             + pRegion%mixt%piclGradPhiRSG(ZCOORD,9,i))
 
          ! Temporarily storing the values in an array for plotting and viewing in ParaView
          ! I should probably delete that later
-         pRegion%mixt%piclDivPhiRSG(1,:) = -DivPhiRSG(1,:)*pregion%grid%vol(1:nCells)
-         pRegion%mixt%piclDivPhiRSG(2,:) = -DivPhiRSG(2,:)*pregion%grid%vol(1:nCells)
-         pRegion%mixt%piclDivPhiRSG(3,:) = -DivPhiRSG(3,:)*pregion%grid%vol(1:nCells)
+         pRegion%mixt%piclDivPhiRSG(1,i) = -DivPhiRSG(1,i)
+         pRegion%mixt%piclDivPhiRSG(2,i) = -DivPhiRSG(2,i)
+         pRegion%mixt%piclDivPhiRSG(3,i) = -DivPhiRSG(3,i)
 
 
 ! Div (\phi_g Q_sg) - comma denotes partial derivative (,3 -> partial / partial x_3)
 ! Scalar: Div(\phi_g Q_sg) = (\phi Q_1),1 + (\phi Q_2),2 + (\phi Q_3),3
-         pRegion%mixt%piclDivPhiQsg(:) = -pregion%grid%vol(1:nCells)*(                   &
-                                          pRegion%mixt%piclGradPhiQsg(XCOORD,1,1:nCells) &
-                                        + pRegion%mixt%piclGradPhiQsg(YCOORD,2,1:nCells) &
-                                        + pRegion%mixt%piclGradPhiQsg(ZCOORD,3,1:nCells))
+         DivPhiQsg(i) =  pregion%grid%vol(i)*(                   &
+                         pRegion%mixt%piclGradPhiQsg(XCOORD,1,i) &
+                       + pRegion%mixt%piclGradPhiQsg(YCOORD,2,i) &
+                       + pRegion%mixt%piclGradPhiQsg(ZCOORD,3,i))
+
+         pRegion%mixt%piclDivPhiQsg(i) = -DivPhiQsg(i)
+ 
+ IF (IsNan(pRegion%mixt%piclDivPhiQsg(i)) .EQV. .TRUE.) THEN
+        write(*,*) "BROKEN-QSG, i ", pRegion%mixt%piclDivPhiQsg(i), i
+        write(*,*) "pregion%grid%vol(i)", pregion%grid%vol(i)
+        write(*,*) "pRegion%mixt%piclGradPhiQsg(XCOORD,1,i)", pRegion%mixt%piclGradPhiQsg(XCOORD,1,i)
+        write(*,*) "pRegion%mixt%piclGradPhiQsg(YCOORD,2,i)", pRegion%mixt%piclGradPhiQsg(YCOORD,2,i)
+        write(*,*) "pRegion%mixt%piclGradPhiQsg(ZCOORD,3,i)", pRegion%mixt%piclGradPhiQsg(ZCOORD,3,i)
+        write(*,*) "rhog(i), ugas(1:3,i)", rhog(i), ugas(1:3,i)
+        write(*,*) "JTSGCell(1:3,i) ", JTSGCell(1:3,i)
+        write(*,*) "JRSGCell(1:9,i)", JRSGCell(:,i)
+        CALL ErrorStop(global,ERR_INVALID_VALUE ,__LINE__,'PPICLF:Broken QSG')
+endif
          
-         pRegion%mixt%piclRhsMom(1,:) = pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells)
-         pRegion%mixt%piclRhsMom(2,:) = pRegion%mixt%rhs(CV_MIXT_YMOM,1:nCells)
-         pRegion%mixt%piclRhsMom(3,:) = pRegion%mixt%rhs(CV_MIXT_ZMOM,1:nCells)
+         pRegion%mixt%piclRhsMom(1,i) = pRegion%mixt%rhs(CV_MIXT_XMOM,i)
+         pRegion%mixt%piclRhsMom(2,i) = pRegion%mixt%rhs(CV_MIXT_YMOM,i)
+         pRegion%mixt%piclRhsMom(3,i) = pRegion%mixt%rhs(CV_MIXT_ZMOM,i)
 
          pRegion%mixt%piclRhsEnergy = pRegion%mixt%rhs(CV_MIXT_ENER,1:nCells)
 
          ! Feedback Div(phi Rsg) to the Fluid Momentum Equations
-         pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells) &
-                          = pRegion%mixt%rhs(CV_MIXT_XMOM,1:nCells) &
-                          - DivPhiRSG(XCOORD,:)*pregion%grid%vol(1:nCells) 
+         pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
+                          = pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
+                          - DivPhiRSG(XCOORD,i) 
          
-         pRegion%mixt%rhs(CV_MIXT_YMOM,1:nCells) &
-                          = pRegion%mixt%rhs(CV_MIXT_YMOM,1:nCells) &
-                          - DivPhiRSG(YCOORD,:)*pregion%grid%vol(1:nCells) 
+         pRegion%mixt%rhs(CV_MIXT_YMOM,i) &
+                          = pRegion%mixt%rhs(CV_MIXT_YMOM,i) &
+                          - DivPhiRSG(YCOORD,i) 
 
-         pRegion%mixt%rhs(CV_MIXT_ZMOM,1:nCells) &
-                          = pRegion%mixt%rhs(CV_MIXT_ZMOM,1:nCells) &
-                          - DivPhiRSG(ZCOORD,:)*pregion%grid%vol(1:nCells) 
+         pRegion%mixt%rhs(CV_MIXT_ZMOM,i) &
+                          = pRegion%mixt%rhs(CV_MIXT_ZMOM,i) &
+                          - DivPhiRSG(ZCOORD,i)
                         
          ! Feedback Div(phi Qsg) to the Fluid Energy Equation
-         pRegion%mixt%rhs(CV_MIXT_ENER,1:nCells) &
-                          = pRegion%mixt%rhs(CV_MIXT_ENER,1:nCells) &
-                          - pRegion%mixt%piclDivPhiQsg(:)
+         pRegion%mixt%rhs(CV_MIXT_ENER,i) &
+                          = pRegion%mixt%rhs(CV_MIXT_ENER,i) &
+                          - DivPhiQsg(i)
+
+        ENDDO
 
        endif ! piclPseudoTurbFlag
 !---------------------------------------------------------------------------------------
 
 END IF ! global%piclFeedbackFlag
-
+!--------------------------------------------------------------------------------------
+! write data to check if ghost is being updated on next RK step
+if(global%myProcID .eq. 0) then
+  write(123,*) global%currentTime, pRegion%irkStep, pRegion%mixt%piclKsg(:)
+endif
+!----------------------------------------------------------------------------
 !
 !Due to moving particle integration stuff stoping this for now
 DO i = 1,pRegion%grid%nCells
@@ -1549,6 +1597,12 @@ end DO
     END IF ! global%error
 
     DEALLOCATE(ugas,STAT=errorFlag)
+    global%error = errorFlag
+    IF ( global%error /= ERR_NONE ) THEN
+      CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')
+    END IF ! global%error
+
+    DEALLOCATE(DivPhiQsg,STAT=errorFlag)
     global%error = errorFlag
     IF ( global%error /= ERR_NONE ) THEN
       CALL ErrorStop(global,ERR_DEALLOCATE,__LINE__,'PPICLF:xGrid')

@@ -89,6 +89,7 @@ MODULE RFLU_ModConvertCv
   USE ModGrid, ONLY: t_grid
   USE ModDataStruct, ONLY: t_region
     
+  USE ModMixture, ONLY: t_mixt 
 
   IMPLICIT NONE
    
@@ -319,13 +320,13 @@ MODULE RFLU_ModConvertCv
         END IF
       END IF
                   CASE DEFAULT
-                    CALL ErrorStop(global,ERR_REACHED_DEFAULT,345)
+                    CALL ErrorStop(global,ERR_REACHED_DEFAULT,346)
                 END SELECT ! pRegion%mixtInput%gasModel              
 
 ! ----------- Default ----------------------------------------------------------
 
               CASE DEFAULT
-                CALL ErrorStop(global,ERR_REACHED_DEFAULT,351)     
+                CALL ErrorStop(global,ERR_REACHED_DEFAULT,352)     
             END SELECT ! pRegion%mixtInput%fluidModel 
              
 ! ------------------------------------------------------------------------------          
@@ -333,7 +334,7 @@ MODULE RFLU_ModConvertCv
 ! ------------------------------------------------------------------------------
   
           CASE DEFAULT
-            CALL ErrorStop(global,ERR_REACHED_DEFAULT,359)   
+            CALL ErrorStop(global,ERR_REACHED_DEFAULT,360)   
         END SELECT ! cvStateFuture
 
 ! ==============================================================================
@@ -341,7 +342,7 @@ MODULE RFLU_ModConvertCv
 ! ==============================================================================
 
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,367)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,368)
     END SELECT ! pRegion%mixt%cvStateFuture
 
 ! ******************************************************************************
@@ -386,6 +387,7 @@ MODULE RFLU_ModConvertCv
     USE ModSpecies, ONLY: t_spec_input
     USE ModInterfacesSpecies, ONLY: SPEC_GetSpeciesIndex
     USE SPEC_RFLU_ModPBAUtils, ONLY: SPEC_RFLU_PBA_GetSolution
+    USE ModMixture, ONLY: t_mixt
 
 ! ******************************************************************************
 !   Definitions and declarations
@@ -408,6 +410,7 @@ MODULE RFLU_ModConvertCv
                     rYg,rYl,rYv,t,u,ud,v,Vm2,vFrac,w,YExplosive,YProducts
 
     REAL(RFREAL) :: r_pure !Varaible to hold pure (non-vf weighted) density for conversions/EoS calls
+    REAL(RFREAL) :: ksg ! Variable for Pseudo-turbulent kinetic energy
 
     REAL(RFREAL), DIMENSION(:,:), POINTER :: pCv,pDv,pGv
     LOGICAL :: scalarConvFlag
@@ -416,6 +419,7 @@ MODULE RFLU_ModConvertCv
     TYPE(t_spec_input), POINTER :: pSpecInput 
     TYPE(t_grid), POINTER :: pGrid
     TYPE(t_global), POINTER :: global
+    
 
 ! ******************************************************************************
 !   Start
@@ -477,17 +481,19 @@ MODULE RFLU_ModConvertCv
                   w = pCv(CV_MIXT_ZVEL,icg)
                   p = pCv(CV_MIXT_PRES,icg)
 
+                  ksg = pRegion%mixt%piclKsg(icg) 
+
                   pCv(CV_MIXT_XMOM,icg) = r*u
                   pCv(CV_MIXT_YMOM,icg) = r*v
                   pCv(CV_MIXT_ZMOM,icg) = r*w
 
                   g  = global%refGamma
 
-                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w)
+                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
                        r_pure = r/(1.0_RFREAL-pRegion%mixt%piclVF(icg))
-                       pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w)
+                       pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
 
 
@@ -502,6 +508,8 @@ MODULE RFLU_ModConvertCv
                     v = pCv(CV_MIXT_YVEL,icg)
                     w = pCv(CV_MIXT_ZVEL,icg)
                     p = pDv(DV_MIXT_PRES,icg)
+                    
+                    ksg = pRegion%mixt%piclKsg(icg) 
 
                     pCv(CV_MIXT_XMOM,icg) = r*u
                     pCv(CV_MIXT_YMOM,icg) = r*v
@@ -512,11 +520,11 @@ MODULE RFLU_ModConvertCv
                     gc = MixtPerf_R_M(mw)
                     g  = MixtPerf_G_CpR(cp,gc)
 
-                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w)
+                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
                        r_pure = r/(1.0_RFREAL-pRegion%mixt%piclVF(icg))
-                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w)
+                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
 
                   END DO ! icg 
@@ -524,12 +532,12 @@ MODULE RFLU_ModConvertCv
                 ELSE
                   IF ( pRegion%mixtInput%gasModel /= GAS_MODEL_MIXT_TCPERF ) &
                     THEN
-                    CALL ErrorStop(global,ERR_GASMODEL_INVALID,594, & 
+                    CALL ErrorStop(global,ERR_GASMODEL_INVALID,602, & 
                                    'Program burn needs mixture gas model.')              
                   END IF ! gasModel  
 
                   IF ( global%specUsed .EQV. .FALSE. ) THEN
-                    CALL ErrorStop(global,ERR_REACHED_DEFAULT,599) ! Defensive coding
+                    CALL ErrorStop(global,ERR_REACHED_DEFAULT,607) ! Defensive coding
                   END IF ! global%specUsed
 
                   iCvSpecExplosive = SPEC_GetSpeciesIndex(global,pSpecInput, &
@@ -558,6 +566,8 @@ MODULE RFLU_ModConvertCv
                     mw = pGv(GV_MIXT_MOL,indMol*icg)                  
                     gc = MixtPerf_R_M(mw)
                     g  = MixtPerf_G_CpR(cp,gc)
+                    
+                    ksg = pRegion%mixt%piclKsg(icg) 
 
                     !vFrac = (1.0_RFREAL - pRegion%plag%vFracE(1,indVFracE*icg))
 
@@ -575,10 +585,10 @@ MODULE RFLU_ModConvertCv
 !                         2. Use same material properties for both species
 ! END DEBUG                    
                     IF ( ABS(YExplosive) < nTol ) THEN
-                     pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w)
+                     pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
-                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w)
+                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
                     ELSEIF ( ABS(1.0_RFREAL-YExplosive) < nTol ) THEN
                       ro = pRegion%mixtInput%prepRealVal6
@@ -587,10 +597,10 @@ MODULE RFLU_ModConvertCv
                       CALL SPEC_RFLU_PBA_GetSolution(gProducts,gcProducts,ro,po,ud, &
                                                      YProducts,e,p,d,dummyVal,dummyVal)
 
-                      pCv(CV_MIXT_ENER,icg) = d*e+0.5_RFREAL*d*(u*u+v*v+w*w)
+                      pCv(CV_MIXT_ENER,icg) = d*(e + 0.5_RFREAL*(u*u+v*v+w*w) + ksg)
                     ELSE
                       p                     = p/YProducts
-                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w)
+                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
                       !Fred Note - This implemntation is most likely correct now
                       !if running program burn + plag...but should be double
                       !checked - .05/13/2022
@@ -599,7 +609,7 @@ MODULE RFLU_ModConvertCv
                       !picl - .04/19/2023  
 
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
-                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,gProducts,p,u,v,w)
+                       pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,gProducts,p,u,v,w,ksg)
                       END IF
                     END IF ! YExplosive
                   END DO ! icg 
@@ -638,8 +648,9 @@ MODULE RFLU_ModConvertCv
 
                 Cvm = (rYl*cvl + rYg*cvg + rYv*cvv)/r
                 Vm2 = u*u + v*v + w*w
+                ksg = pRegion%mixt%piclKsg(icg)
 
-                pCv(CV_MIXT_ENER,icg) = r*MixtGasLiq_Eo_CvmTVm2(Cvm,t,Vm2)
+                pCv(CV_MIXT_ENER,icg) = r*MixtGasLiq_Eo_CvmTVm2(Cvm,t,Vm2,ksg)
               END DO ! icg
 
 ! ------------------------------------------------------------------------------
@@ -667,6 +678,8 @@ MODULE RFLU_ModConvertCv
                   v = pCv(CV_MIXT_YVEL,icg)
                   w = pCv(CV_MIXT_ZVEL,icg)
                   p = pDv(DV_MIXT_PRES,icg)
+                  
+                  ksg = pRegion%mixt%piclKsg(icg)
 
                   pCv(CV_MIXT_XMOM,icg) = r*u
                   pCv(CV_MIXT_YMOM,icg) = r*v
@@ -682,7 +695,7 @@ MODULE RFLU_ModConvertCv
                   e = YProducts*pDv(DV_MIXT_EJWL,icg) &
                     + (1.0_RFREAL-YProducts)*pDv(DV_MIXT_EPERF,icg) 
                   
-                  pCv(CV_MIXT_ENER,icg) = r*(e + 0.5_RFREAL*(u*u+v*v+w*w))
+                  pCv(CV_MIXT_ENER,icg) = r*(e + 0.5_RFREAL*(u*u+v*v+w*w) + ksg) 
 
                 END DO ! icg 
                 
@@ -697,11 +710,11 @@ MODULE RFLU_ModConvertCv
 ! ------------------------------------------------------------------------------
 
             CASE DEFAULT 
-              CALL ErrorStop(global,ERR_REACHED_DEFAULT,807)
+              CALL ErrorStop(global,ERR_REACHED_DEFAULT,820)
           END SELECT ! pRegion%mixtInput
           
         CASE DEFAULT
-          CALL ErrorStop(global,ERR_REACHED_DEFAULT,811)
+          CALL ErrorStop(global,ERR_REACHED_DEFAULT,824)
       END SELECT ! cvStateFuture
 
 ! ==============================================================================
@@ -709,7 +722,7 @@ MODULE RFLU_ModConvertCv
 ! ==============================================================================
 
     ELSE
-      CALL ErrorStop(global,ERR_REACHED_DEFAULT,819)
+      CALL ErrorStop(global,ERR_REACHED_DEFAULT,832)
     END IF ! pRegion%mixt%cvState                   
                          
 ! ******************************************************************************
@@ -808,7 +821,7 @@ MODULE RFLU_ModConvertCv
 ! ==============================================================================
 
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,921)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,934)
     END SELECT ! cvScalStateCurrent
 
 ! ******************************************************************************
@@ -906,7 +919,7 @@ MODULE RFLU_ModConvertCv
 ! ==============================================================================
 
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,1019)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,1032)
     END SELECT ! cvScalStateCurrent
 
 ! ******************************************************************************

@@ -466,7 +466,7 @@ SUBROUTINE RFLU_DeallocateMemorySolCv(pRegion)
     CALL ErrorStop(global,ERR_DEALLOCATE,455,'pRegion%mixt%cvInfo')
   END IF ! global%error
 
-  IF ( global%piclUsed .EQV. .TRUE. ) THEN
+!  IF ( global%piclUsed .EQV. .TRUE. ) THEN
     DEALLOCATE(pRegion%mixt%piclVF,STAT=errorFlag)
     ! 03/19/2025 - Thierry - begins here 
     DEALLOCATE(pRegion%mixt%piclVFg,STAT=errorFlag)
@@ -491,7 +491,7 @@ SUBROUTINE RFLU_DeallocateMemorySolCv(pRegion)
     DEALLOCATE(pRegion%mixt%piclFeedback,STAT=errorFlag)
     DEALLOCATE(pRegion%mixt%piclgradFeedback,STAT=errorFlag)
     ! 04/01/2025 - TLJ - ends here 
-  END IF
+!  END IF
 
 
 

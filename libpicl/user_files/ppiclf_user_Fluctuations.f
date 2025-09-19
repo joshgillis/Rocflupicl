@@ -481,7 +481,10 @@
         F10 =  0.0453;
         F11 = -0.0265;
      
-        Tmean_par = 0.0d0 ! zero out variable first
+        ! zero out variables  at first
+        Rmean_par = 0.0d0 ; Rmean_perp = 0.0d0
+        R = 0.0d0; Rsg = 0.0d0
+        Tmean_par = 0.0d0; T_par = 0.0d0
         
         ! CD_average is zero at early time steps
 
@@ -490,6 +493,9 @@
         CD_average = fqsx*avec(1) +
      >               fqsy*avec(2) +
      >               fqsz*avec(3)
+
+        ! avoiding singularity
+        if(CD_average .lt. 1.d-8) return
 
         ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
                                                                        
@@ -609,6 +615,13 @@ c---     We ditch Osnes's expression for s_perp and assume it as big as s_par
         R_perp = 1.0 + A3 * CD_prime / CD_average + xi_perp
 
         if(IsNan(R_par) .or. IsNan(R_perp)) then
+          print*, "rep, rmachp, rphip =", rep, rmachp, rphip
+          print*, "vmag, rhof, asndf =", vmag, rhof, asndf
+          print*, "re, mp, phi =", re, mp, phi
+          print*, "A1, A2, A3 =", A1, A2, A3
+          print*, "CD_prime, CD_average =", CD_prime, CD_average
+          print*, "xi_par, xi_perp =", xi_par, xi_perp
+          print*, "Rmean_par, Rmean_perp =", Rmean_par, Rmean_perp
           print*, "R_par =", R_par, "R_perp =", R_perp
           STOP
         endif
@@ -631,9 +644,6 @@ c---  bvec, cvec: two orthogonal vectors to avec
   
         Qt = transpose(Q)
   
-        ! zero out matrices at first
-        R = 0.0d0
-        Rsg = 0.0d0
   
 c--- R = |R_par,   0   ,   0   |
 c---     | 0   , R_perp,   0   |
@@ -649,7 +659,8 @@ c--- Now Rotate the matrix, Rsg = Q . R . Q^T
        Rsg = matmul(Q, matmul(R,Qt))
 
 c--- Osnes Formulation for PTKE
-       T_par = A4 * CD_prime/CD_average + xi_T
+
+      T_par = A4 * CD_prime/CD_average + xi_T
 
 c--  Multiply by the mean relative velocity & flow kinetic energy to dimentionalize      
 c--  then add mean PTKE
@@ -661,17 +672,27 @@ c--  then add mean PTKE
 
        T_par(3) = T_par(3) * vz * k_Osnes * 0.5d0 * vmag**2 
      >            + Tmean_par(3)
-       
-!       if(iStage .eq. 3 .and. i<= 5) then
-!         write(90+i, *) ppiclf_time, re, mp, phi,
-!     >                  k_tilde, k_Mach, k_Osnes,
-!     >                  b_par, b_Mach, b_Osnes,
-!     >                  Rmean_par/(0.5d0*vmag**2), 
-!     >                  Rmean_perp/(0.5d0*vmag**2),
-!     >               R_par/Rmean_par, R_perp/Rmean_perp,
-!     >                  xi_par, xi_perp, s_par, s_perp,
-!     >                  A3   
-!       endif
+
+       if(IsNan(T_par(1)) .or. IsNan(T_par(2)).or.IsNan(T_par(3))) then
+         print*, "T_par(1:3, i) =", T_par
+         print*, "Tmean_par(1:3,i) =", Tmean_par
+         print*, "k_Osnes =", k_Osnes
+         print*, "vmag, vx, vy, vz =", vmag, vx, vy, vz
+         print*, "A4, xi_T =", A4, xi_T
+         print*, "CD_prime, CD_average =", CD_prime, CD_average
+         STOP
+       endif
+
+       if((T_par(1).gt. 1.d30) .or. (T_par(2).gt.1.d30)
+     >     .or. (T_par(3).gt.1.d30)) then
+         print*, "T_par(1:3, i) =", T_par
+         print*, "Tmean_par(1:3,i) =", Tmean_par
+         print*, "k_Osnes =", k_Osnes
+         print*, "vmag, vx, vy, vz =", vmag, vx, vy, vz
+         print*, "A4, xi_T =", A4, xi_T
+         print*, "CD_prime, CD_average =", CD_prime, CD_average
+         STOP
+       endif
 
       endif ! pseudoTurb_flag
 

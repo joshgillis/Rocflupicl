@@ -66,16 +66,16 @@
 !
 !******************************************************************************
 
-FUNCTION MixtPerf_P_DEoGVm2(D,Eo,G,Vm2)
+FUNCTION MixtPerf_P_DEoGVm2(D,Eo,G,Vm2,KSG)
 
   USE ModDataTypes
 
   IMPLICIT NONE
   
-  REAL(RFREAL), INTENT(IN) :: D,Eo,G,Vm2
+  REAL(RFREAL), INTENT(IN) :: D,Eo,G,Vm2,KSG
   REAL(RFREAL) :: MixtPerf_P_DEoGVm2
    
-  MixtPerf_P_DEoGVm2 = (G - 1.0_RFREAL)*D*(Eo - 0.5_RFREAL*Vm2)
+  MixtPerf_P_DEoGVm2 = (G - 1.0_RFREAL)*D*(Eo - 0.5_RFREAL*Vm2 - KSG)
 
 END FUNCTION MixtPerf_P_DEoGVm2
 

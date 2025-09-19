@@ -2719,7 +2719,7 @@ MODULE RFLU_ModReadWriteFlow
       WRITE(iFile) (pRegion%mixt%piclRhsEnergy(j),j=1,pGrid%nCells)
       WRITE(iFile) (pRegion%mixt%piclRhsMom(:,j),j=1,pGrid%nCells)
       WRITE(iFile) (pRegion%mixt%piclJF(:,j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclKsg(j),j=1,pGrid%nCells)
+      WRITE(iFile) (pRegion%mixt%piclKsg(j),j=1,pGrid%nCellsTot)
       ! 03/20/2025 - Thierry - ends here
 
   END IF

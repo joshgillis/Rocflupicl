@@ -52,6 +52,7 @@
       real*8 UnifRnd(6), Rsg(3,3), T_par(3)
       common /user_fluct02/ UnifRnd, Rsg, T_par
 
+
 !
 ! For ppiclf_user_debug.f
 !

@@ -207,9 +207,11 @@ SUBROUTINE RungeKuttaMP( regions )
 ! ----- set ghost fluid solution ----------------------------------------------
 
 ! TEMPORARY: Manoj: GFM, need to put more thinking
+
         CALL RFLU_GFM_SetGhostFluid( pRegion )
 
 ! ----- store previous solution; set dissipation to zero ----------------------
+
         CALL RKInitMP( regions(iReg),istage )
 
 ! ----- compute cell-gradients for higher-order scheme ------------------------

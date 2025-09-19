@@ -65,6 +65,5 @@
       map(PPICLF_P_JTSG2)  = rprop4(PPICLF_R_JTSG2)
       map(PPICLF_P_JTSG3)  = rprop4(PPICLF_R_JTSG3)
 
-
       return
       end
