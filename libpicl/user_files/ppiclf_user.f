@@ -705,10 +705,12 @@
      >           qq )
 
             else ! Pseudo Turbulence is OFF
+            ! 09/19/2025 - Thierry - Added Lift force
+            ! Still need to add Torue \cdot angular velocity
             ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i) *
-     >         ( (fqsx+fvux)*ppiclf_y(PPICLF_JVX,i) + 
-     >           (fqsy+fvuy)*ppiclf_y(PPICLF_JVY,i) + 
-     >           (fqsz+fvuz)*ppiclf_y(PPICLF_JVZ,i) +
+     >         ( (fqsx+fvux+liftx)*ppiclf_y(PPICLF_JVX,i) + 
+     >           (fqsy+fvuy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
+     >           (fqsz+fvuz+liftz)*ppiclf_y(PPICLF_JVZ,i) +
      >                  famx*ppiclf_rprop(PPICLF_R_JUX,i) +
      >                  famy*ppiclf_rprop(PPICLF_R_JUY,i) +
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
