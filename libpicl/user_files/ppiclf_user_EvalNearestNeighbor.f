@@ -289,21 +289,19 @@
                tcy = rad1*(rn_12z*Ftx - rn_12x*Ftz)
                tcz = rad1*(rn_12x*Fty - rn_12y*Ftx)
 
-               if (collisional_flag>=3) then
-                  ! Add Rolling torque contribution
-                  thetar = 0.06  ! Needs to be calibrated
-                  dp1 = rpropi(PPICLF_R_JDP)
-                  dp2 = rpropj(PPICLF_R_JDP)
-                  r12 = 0.5d0*(dp1*dp2)/(dp1+dp2)
-                  omgrx = yi(PPICLF_JOX) - yj(PPICLF_JOX)
-                  omgry = yi(PPICLF_JOY) - yj(PPICLF_JOY)
-                  omgrz = yi(PPICLF_JOZ) - yj(PPICLF_JOZ)
-                  omgr_mag = sqrt(omgrx*omgrx+omgry*omgry+omgrz*omgrz)
-                  omgr_mag = max(omgr_mag,1.d-8)
-                  trx = -thetar*Fn_mag*r12*omgrx/omgr_mag
-                  try = -thetar*Fn_mag*r12*omgry/omgr_mag
-                  trz = -thetar*Fn_mag*r12*omgrz/omgr_mag
-               endif
+               ! Add Rolling torque contribution
+               thetar = 0.06  ! Needs to be calibrated
+               dp1 = rpropi(PPICLF_R_JDP)
+               dp2 = rpropj(PPICLF_R_JDP)
+               r12 = 0.5d0*(dp1*dp2)/(dp1+dp2)
+               omgrx = yi(PPICLF_JOX) - yj(PPICLF_JOX)
+               omgry = yi(PPICLF_JOY) - yj(PPICLF_JOY)
+               omgrz = yi(PPICLF_JOZ) - yj(PPICLF_JOZ)
+               omgr_mag = sqrt(omgrx*omgrx+omgry*omgry+omgrz*omgrz)
+               omgr_mag = max(omgr_mag,1.d-8)
+               trx = -thetar*Fn_mag*r12*omgrx/omgr_mag
+               try = -thetar*Fn_mag*r12*omgry/omgr_mag
+               trz = -thetar*Fn_mag*r12*omgrz/omgr_mag
             endif
 
 

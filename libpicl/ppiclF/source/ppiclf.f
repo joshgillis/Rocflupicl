@@ -693,9 +693,9 @@
 
             ! Energy equation feedback term
             ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i) *
-     >         ( (fqsx+fvux)*ppiclf_y(PPICLF_JVX,i) + 
-     >           (fqsy+fvuy)*ppiclf_y(PPICLF_JVY,i) + 
-     >           (fqsz+fvuz)*ppiclf_y(PPICLF_JVZ,i) +
+     >         ( (fqsx+fvux+liftx)*ppiclf_y(PPICLF_JVX,i) + 
+     >           (fqsy+fvuy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
+     >           (fqsz+fvuz+liftz)*ppiclf_y(PPICLF_JVZ,i) +
      >                  famx*ppiclf_rprop(PPICLF_R_JUX,i) +
      >                  famy*ppiclf_rprop(PPICLF_R_JUY,i) +
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
@@ -2197,8 +2197,13 @@
 
       ! Sangani's volume fraction correction for dilute random arrays
       ! Capping volume fraction at 0.5 
-      rcd_am = rcd_am*(1.0+3.32*min(rphip,0.5))
+      ! 09/20/2025 - Thierry - Sangani's volume fraction correction
+      ! overshoots Unary added-mass term A LOT. 
+      !rcd_am = rcd_am*(1.0+3.32*min(rphip,0.5))
 
+      ! Adopting the volume fraction correction from Beguin & Etienne
+      ! (2016).
+      rcd_am = rcd_am*(1.0+0.68*rphip**2)
       rmass_add = rhof*ppiclf_rprop(PPICLF_R_JVOLP,i)*rcd_am
 
       !NEW Added mass, using how rocflu does it
@@ -3522,8 +3527,6 @@
 
       if (collisional_flag >= 3) then
          call Torque_Hydro(i,taux_hydro,tauy_hydro,tauz_hydro)
-      endif
-      if (collisional_flag == 4) then
          call Torque_Undisturbed(i,taux_undist,tauy_undist,tauz_undist)
       endif
 
@@ -4501,21 +4504,19 @@
                tcy = rad1*(rn_12z*Ftx - rn_12x*Ftz)
                tcz = rad1*(rn_12x*Fty - rn_12y*Ftx)
 
-               if (collisional_flag>=3) then
-                  ! Add Rolling torque contribution
-                  thetar = 0.06  ! Needs to be calibrated
-                  dp1 = rpropi(PPICLF_R_JDP)
-                  dp2 = rpropj(PPICLF_R_JDP)
-                  r12 = 0.5d0*(dp1*dp2)/(dp1+dp2)
-                  omgrx = yi(PPICLF_JOX) - yj(PPICLF_JOX)
-                  omgry = yi(PPICLF_JOY) - yj(PPICLF_JOY)
-                  omgrz = yi(PPICLF_JOZ) - yj(PPICLF_JOZ)
-                  omgr_mag = sqrt(omgrx*omgrx+omgry*omgry+omgrz*omgrz)
-                  omgr_mag = max(omgr_mag,1.d-8)
-                  trx = -thetar*Fn_mag*r12*omgrx/omgr_mag
-                  try = -thetar*Fn_mag*r12*omgry/omgr_mag
-                  trz = -thetar*Fn_mag*r12*omgrz/omgr_mag
-               endif
+               ! Add Rolling torque contribution
+               thetar = 0.06  ! Needs to be calibrated
+               dp1 = rpropi(PPICLF_R_JDP)
+               dp2 = rpropj(PPICLF_R_JDP)
+               r12 = 0.5d0*(dp1*dp2)/(dp1+dp2)
+               omgrx = yi(PPICLF_JOX) - yj(PPICLF_JOX)
+               omgry = yi(PPICLF_JOY) - yj(PPICLF_JOY)
+               omgrz = yi(PPICLF_JOZ) - yj(PPICLF_JOZ)
+               omgr_mag = sqrt(omgrx*omgrx+omgry*omgry+omgrz*omgrz)
+               omgr_mag = max(omgr_mag,1.d-8)
+               trx = -thetar*Fn_mag*r12*omgrx/omgr_mag
+               try = -thetar*Fn_mag*r12*omgry/omgr_mag
+               trz = -thetar*Fn_mag*r12*omgrz/omgr_mag
             endif
 
 

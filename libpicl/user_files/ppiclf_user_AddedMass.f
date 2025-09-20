@@ -58,8 +58,13 @@
 
       ! Sangani's volume fraction correction for dilute random arrays
       ! Capping volume fraction at 0.5 
-      rcd_am = rcd_am*(1.0+3.32*min(rphip,0.5))
+      ! 09/20/2025 - Thierry - Sangani's volume fraction correction
+      ! overshoots Unary added-mass term A LOT. 
+      !rcd_am = rcd_am*(1.0+3.32*min(rphip,0.5))
 
+      ! Adopting the volume fraction correction from Beguin & Etienne
+      ! (2016).
+      rcd_am = rcd_am*(1.0+0.68*rphip**2)
       rmass_add = rhof*ppiclf_rprop(PPICLF_R_JVOLP,i)*rcd_am
 
       !NEW Added mass, using how rocflu does it

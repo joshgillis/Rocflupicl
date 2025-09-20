@@ -62,8 +62,6 @@
 
       if (collisional_flag >= 3) then
          call Torque_Hydro(i,taux_hydro,tauy_hydro,tauz_hydro)
-      endif
-      if (collisional_flag == 4) then
          call Torque_Undisturbed(i,taux_undist,tauy_undist,tauz_undist)
       endif
 
