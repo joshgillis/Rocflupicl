@@ -377,6 +377,7 @@ END IF
         END IF !
     END DO ! iReg
 
+! ----- update information in ghost cells -------------------------------------
     CALL RFLU_MPI_CopyWrapper(regions)
 
     DO iReg = 1,global%nRegionsLocal
@@ -393,7 +394,7 @@ END IF
 
       CALL RFLU_MPI_ClearRequestWrapper(pRegion)
     END DO ! iReg
-
+! ------ done updating information in ghost cells -----------------------------
 #ifdef PLAG
     IF ( global%plagUsed .EQV. .TRUE. ) THEN
       CALL PLAG_RFLU_CommDriver(regions)
@@ -441,7 +442,6 @@ IF ( global%piclUsed .EQV. .true. ) THEN
 !Update virtual cells with picl_vf
       DO iReg = 1,global%nRegionsLocal
         pRegion => regions(iReg)
-
         CALL RFLU_MPI_PLAG_ISendWrapper(pRegion)
       END DO ! iReg
 
@@ -449,15 +449,35 @@ IF ( global%piclUsed .EQV. .true. ) THEN
 
       DO iReg = 1,global%nRegionsLocal
         pRegion => regions(iReg)
-
         CALL RFLU_MPI_PLAG_RecvWrapper(pRegion)
       END DO ! iReg
 
       DO iReg = 1,global%nRegionsLocal
         pRegion => regions(iReg)
-
         CALL RFLU_MPI_ClearRequestWrapper(pRegion)
       END DO ! iReg
+
+! Testing a run without these MPI calls to make sure they solved the problem
+! of NaN speed of sound
+!! ------ Update PTKE Ksg array for ghost cells ---------
+      if(global%piclPseudoTurbFlag .eq. 1) then
+        DO iReg = 1,global%nRegionsLocal
+          pRegion => regions(iReg)
+          CALL RFLU_MPI_Ksg_ISendWrapper(pRegion)
+        END DO ! iReg
+
+        CALL RFLU_MPI_Ksg_CopyWrapper(regions)
+
+        DO iReg = 1,global%nRegionsLocal
+          pRegion => regions(iReg)
+          CALL RFLU_MPI_Ksg_RecvWrapper(pRegion)
+        END DO ! iReg
+
+        DO iReg = 1,global%nRegionsLocal
+          pRegion => regions(iReg)
+          CALL RFLU_MPI_ClearRequestWrapper(pRegion)
+        END DO ! iReg
+      endif ! PseudoTurbFlag
 
 END IF
 #endif

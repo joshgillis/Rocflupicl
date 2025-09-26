@@ -1181,6 +1181,8 @@ SUBROUTINE RFLU_NSCBC_CompSecondPatchFlux(pRegion,pPatch)
     wr   = pPatch%mixt%cv(CV_MIXT_ZMOM,ifl)*irr
     pr   = pPatch%mixt%dv(DV_MIXT_PRES,ifl)
 
+    ksg = pRegion%mixt%piclKsg(ifl)
+
     IF (pRegion%mixtInput%gasModel == GAS_MODEL_MIXT_JWL) THEN
 #ifdef SPEC      
       IF (global%specUsed .EQV. .TRUE.) THEN
@@ -1194,7 +1196,7 @@ SUBROUTINE RFLU_NSCBC_CompSecondPatchFlux(pRegion,pPatch)
     Yproducts = pRegion%spec%cv(iCvSpecProducts,c1) !Fred - see above
 
     CALL RFLU_JWL_ComputeEnergyMixt(pRegion,c1,ggas,rgas,pr,rr,Yproducts,ar,er,tr)
-    Hr = er + 0.5_RFREAL * (ur*ur + vr*vr + wr*wr) + (pr/rr)
+    Hr = er + 0.5_RFREAL * (ur*ur + vr*vr + wr*wr) + (pr/rr) + ksg
 
     IF (scalarConvFlag .EQV. .TRUE.) THEN
   CALL RFLU_ScalarConvertCvPrim2Cons(pRegion,pRegion%spec%cv,pRegion%spec%cvState)

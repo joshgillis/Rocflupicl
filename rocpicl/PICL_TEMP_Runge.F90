@@ -1058,10 +1058,10 @@ endif
 
          ! K_sg = 1/(2*rhof) * tr(Rsg), dimension of (nCellsTot)
          ! K_sg to compare with Total Energy of Fluid
-!         pRegion%mixt%piclKsg(i) = 1.0_RFREAL/(2.0_RFREAL*rhog(i)) &
-!                                * (JRSGCell(1,i) + JRSGCell(5,i) + JRSGCell(9,i))
+         pRegion%mixt%piclKsg(i) = 1.0_RFREAL/(2.0_RFREAL*rhog(i)) &
+                                * (JRSGCell(1,i) + JRSGCell(5,i) + JRSGCell(9,i))
 
-         pRegion%mixt%piclKsg(i) = 0.0_RFREAL
+!         pRegion%mixt%piclKsg(i) = 0.0_RFREAL
 !===========================================================================================                              
 ! 08/28/2025 - Thierry - Adding Subgrid Energy Flux from Osnes's model
 ! Q_sg : Subgrid Energy Flux dimension (3, nCells)
@@ -1205,6 +1205,8 @@ endif
          pRegion%mixt%piclRhsEnergy = pRegion%mixt%rhs(CV_MIXT_ENER,1:nCells)
 
          ! Feedback Div(phi Rsg) to the Fluid Momentum Equations
+
+         ! VALIDATE THAT THIS SHOULD BE POSITIVE INSTEAD
          pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
                           = pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
                           - DivPhiRSG(XCOORD,i) 
@@ -1228,13 +1230,7 @@ endif
 !---------------------------------------------------------------------------------------
 
 END IF ! global%piclFeedbackFlag
-!--------------------------------------------------------------------------------------
-! write data to check if ghost is being updated on next RK step
-if(global%myProcID .eq. 0) then
-  write(123,*) global%currentTime, pRegion%irkStep, pRegion%mixt%piclKsg(:)
-endif
-!----------------------------------------------------------------------------
-!
+
 !Due to moving particle integration stuff stoping this for now
 DO i = 1,pRegion%grid%nCells
 !zero out PhiP

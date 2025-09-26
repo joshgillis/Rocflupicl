@@ -1166,6 +1166,8 @@ SUBROUTINE RFLU_NSCBC_CompSecondPatchFlux(pRegion,pPatch)
     wr   = pPatch%mixt%cv(CV_MIXT_ZMOM,ifl)*irr
     pr   = pPatch%mixt%dv(DV_MIXT_PRES,ifl)
 
+    ksg = pRegion%mixt%piclKsg(ifl)
+
     IF (pRegion%mixtInput%gasModel == GAS_MODEL_MIXT_JWL) THEN
       IF (global%specUsed .EQV. .TRUE.) THEN
        IF (pRegion%spec%cvState == CV_MIXT_STATE_PRIM) THEN
@@ -1178,7 +1180,7 @@ SUBROUTINE RFLU_NSCBC_CompSecondPatchFlux(pRegion,pPatch)
     Yproducts = pRegion%spec%cv(iCvSpecProducts,c1) !Fred - see above
 
     CALL RFLU_JWL_ComputeEnergyMixt(pRegion,c1,ggas,rgas,pr,rr,Yproducts,ar,er,tr)
-    Hr = er + 0.5_RFREAL * (ur*ur + vr*vr + wr*wr) + (pr/rr)
+    Hr = er + 0.5_RFREAL * (ur*ur + vr*vr + wr*wr) + (pr/rr) + ksg
 
     IF (scalarConvFlag .EQV. .TRUE.) THEN
   CALL RFLU_ScalarConvertCvPrim2Cons(pRegion,pRegion%spec%cv,pRegion%spec%cvState)
@@ -1487,7 +1489,7 @@ SUBROUTINE RFLU_NSCBC_CompRhs(pRegion)
         CASE (BC_INJECTION)
           CALL RFLU_NSCBC_CompRhsIJ(pRegion,pPatch)
         CASE DEFAULT
-          CALL ErrorStop(global,ERR_REACHED_DEFAULT,1509)
+          CALL ErrorStop(global,ERR_REACHED_DEFAULT,1511)
       END SELECT ! pPatch%bcType
 
       CALL RFLU_AXI_SourceTermsNSCBC(pRegion,pPatch)
@@ -1653,7 +1655,7 @@ SUBROUTINE RFLU_NSCBC_CompRhsFF(pRegion,pPatch)
         ty = 0.0_RFREAL
         tz = 1.0_RFREAL    
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,1675)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,1677)
     END SELECT ! pRegion%mixtInput%dimens    
 
     dxdn = nx
@@ -2086,7 +2088,7 @@ SUBROUTINE RFLU_NSCBC_CompRhsIFVelTemp(pRegion,pPatch)
         ty = 0.0_RFREAL
         tz = 1.0_RFREAL    
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,2108)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,2110)
     END SELECT ! pRegion%mixtInput%dimens    
 
     dxdn = nx
@@ -2671,7 +2673,7 @@ SUBROUTINE RFLU_NSCBC_CompRhsOF(pRegion,pPatch)
         tz = nx*sy-ny*sx
         !t = cross(n,s)   
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,2697)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,2699)
     END SELECT ! pRegion%mixtInput%dimens    
 
     dxdn = nx
@@ -3023,7 +3025,7 @@ SUBROUTINE RFLU_NSCBC_CompRhsSW(pRegion,pPatch)
         ty = 0.0_RFREAL
         tz = 1.0_RFREAL
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,3049)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,3051)
     END SELECT ! pRegion%mixtInput%dimens
 
     dxdn = nx
@@ -3339,7 +3341,7 @@ SUBROUTINE RFLU_NSCBC_InitFF(pRegion,pPatch)
   pPatch%mixt%cvState = CV_MIXT_STATE_CONS
 
   IF (pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN
-    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3365, &
+    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3367, &
                    'region mixt cvState is incompatible...')
   END IF ! pRegion%mixt%cvState
 
@@ -3386,7 +3388,7 @@ SUBROUTINE RFLU_NSCBC_InitFF(pRegion,pPatch)
                                          zc,rl,rul,rvl,rwl,rel,rr,rur, & 
                                          rvr,rwr,rer,pr,ksg)     
     ELSE
-      CALL ErrorStop(global,ERR_REACHED_DEFAULT,3412)
+      CALL ErrorStop(global,ERR_REACHED_DEFAULT,3414)
     END IF ! gasModel
 
     pPatch%mixt%cv(CV_MIXT_DENS,ifl) = rr 
@@ -3486,7 +3488,7 @@ SUBROUTINE RFLU_NSCBC_InitIFTotAng(pRegion,pPatch)
   pPatch%mixt%cvState = CV_MIXT_STATE_CONS
 
   IF (pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN
-    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3512, &
+    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3514, &
                    'region mixt cvState is incompatible...')
   END IF ! pRegion%mixt%cvState
 
@@ -3608,7 +3610,7 @@ SUBROUTINE RFLU_NSCBC_InitIFVelTemp(pRegion,pPatch)
   pPatch%mixt%cvState = CV_MIXT_STATE_CONS
 
   IF (pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN
-    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3634, &
+    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3636, &
                    'region mixt cvState is incompatible...')
   END IF ! pRegion%mixt%cvState
 
@@ -3943,7 +3945,7 @@ SUBROUTINE RFLU_NSCBC_InitOF(pRegion,pPatch)
   pPatch%mixt%cvState = CV_MIXT_STATE_CONS
 
   IF (pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN
-    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3973, &
+    CALL ErrorStop(global,ERR_CV_STATE_INVALID,3975, &
                    'region mixt cvState is incompatible...')
   END IF ! pRegion%mixt%cvState
 
@@ -3972,7 +3974,7 @@ SUBROUTINE RFLU_NSCBC_InitOF(pRegion,pPatch)
 
     ELSE
        WRITE(*,*) 'Error - Must invoke Species module when using JWL NSCBC!!!'
-       CALL ErrorStop(global,ERR_REACHED_DEFAULT,4003) ! Defensive coding    
+       CALL ErrorStop(global,ERR_REACHED_DEFAULT,4005) ! Defensive coding    
 
     END IF !SpecUsed
     END IF !JWL
@@ -4002,7 +4004,7 @@ SUBROUTINE RFLU_NSCBC_InitOF(pRegion,pPatch)
         Eo = Eo + 0.5_RFREAL*(ul*ul+vl*vl+wl*wl) + ksg
     ELSE
         WRITE(*,*) 'Error - Must invoke Species module when using JWL NSCBC!!!'
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4035) ! Defensive coding
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4037) ! Defensive coding
     END IF !SpecUsed 
    ELSE 
     Eo = MixtPerf_Eo_DGPUVW(rl,g,Pr,ul,vl,wl,ksg)
@@ -4097,7 +4099,7 @@ SUBROUTINE RFLU_NSCBC_InitSW(pRegion,pPatch)
   pPatch%mixt%cvState = CV_MIXT_STATE_CONS
 
   IF (pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN
-    CALL ErrorStop(global,ERR_CV_STATE_INVALID,4135, &
+    CALL ErrorStop(global,ERR_CV_STATE_INVALID,4137, &
                    'region mixt cvState is incompatible...')
   END IF ! pRegion%mixt%cvState
 
@@ -4150,7 +4152,7 @@ SUBROUTINE RFLU_NSCBC_InitSW(pRegion,pPatch)
         ty = 0.0_RFREAL
         tz = 1.0_RFREAL
       CASE DEFAULT
-        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4188)
+        CALL ErrorStop(global,ERR_REACHED_DEFAULT,4190)
     END SELECT ! pRegion%mixtInput%dimens
 
     dxdn = nx

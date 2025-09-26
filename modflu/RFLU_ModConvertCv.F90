@@ -540,15 +540,13 @@ MODULE RFLU_ModConvertCv
                       ELSE
                       pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
                       END IF !plagUsed
-#else
-                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
-#endif
-
-#ifdef PICL
+#elif defined(PICL)
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
                        r_pure = r/(1.0_RFREAL-pRegion%mixt%piclVF(icg))
                        pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
+#else
+                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 #endif
 
 
@@ -582,15 +580,13 @@ MODULE RFLU_ModConvertCv
                       ELSE
                       pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
                       END IF !plagUsed
-#else
-                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
-#endif
-
-#ifdef PICL
+#elif defined (PICL)
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
                        r_pure = r/(1.0_RFREAL-pRegion%mixt%piclVF(icg))
                        pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
+#else
+                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 #endif
 
                   END DO ! icg 
@@ -665,14 +661,12 @@ MODULE RFLU_ModConvertCv
                      ELSE
                      pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
                      END IF !plagUsed
-#else
-                     pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
-#endif
-
-#ifdef PICL
+#elif defined(PICL)
                       IF ( global%piclUsed .EQV. .TRUE. ) THEN
                        pCv(CV_MIXT_ENER,icg) =r*MixtPerf_Eo_DGPUVW(r_pure,g,p,u,v,w,ksg)
                       END IF
+#else
+                     pCv(CV_MIXT_ENER,icg) = r*MixtPerf_Eo_DGPUVW(r,g,p,u,v,w,ksg)
 #endif
                     ELSEIF ( ABS(1.0_RFREAL-YExplosive) < nTol ) THEN
                       ro = pRegion%mixtInput%prepRealVal6

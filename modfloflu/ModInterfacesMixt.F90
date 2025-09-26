@@ -123,7 +123,7 @@ MODULE ModInterfacesMixt
     REAL(RFREAL) :: MixtPerf_C_DGP
   END FUNCTION MixtPerf_C_DGP
 
-  FUNCTION MixtPerf_C_GHoVm2( G,Ho,Vm2 )
+  FUNCTION MixtPerf_C_GHoVm2( G,Ho,Vm2)
     USE ModDataTypes
     REAL(RFREAL), INTENT(IN) :: G, Ho, Vm2
     REAL(RFREAL) :: MixtPerf_C_GHoVm2
