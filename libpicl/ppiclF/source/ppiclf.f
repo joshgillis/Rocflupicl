@@ -105,7 +105,8 @@
       real*8    Pres
 
 ! Needed for angular velocity
-      real*8 taux, tauy, tauz, rmass_omega
+      real*8 taux, tauy, tauz, rmass_omega,
+     >       taux_hydro, tauy_hydro, tauz_hydro 
       real*8 tau
       real*8 liftx, lifty, liftz
       real*8 lift
@@ -618,7 +619,8 @@
             taux  = ppiclf_ydotc(PPICLF_JOX,i)
             tauy  = ppiclf_ydotc(PPICLF_JOY,i)
             tauz  = ppiclf_ydotc(PPICLF_JOZ,i) 
-            call ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz)
+            call ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz,
+     >                            taux_hydro,tauy_hydro,tauz_hydro)
          endif ! collisional_flag >= 2
 
 !
@@ -699,6 +701,9 @@
      >                  famx*ppiclf_rprop(PPICLF_R_JUX,i) +
      >                  famy*ppiclf_rprop(PPICLF_R_JUY,i) +
      >                  famz*ppiclf_rprop(PPICLF_R_JUZ,i) +
+     >                  taux_hydro*ppiclf_y(PPICLF_JOX,i) +
+     >                  tauy_hydro*ppiclf_y(PPICLF_JOY,i) +
+     >                  tauz_hydro*ppiclf_y(PPICLF_JOZ,i) +
      >           qq )
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
          endif 
@@ -3485,7 +3490,8 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz)
+      subroutine ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz,
+     >                                 taux_hydro,tauy_hydro,tauz_hydro)
 !
       implicit none
 !

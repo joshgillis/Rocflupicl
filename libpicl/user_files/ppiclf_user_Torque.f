@@ -20,7 +20,8 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz)
+      subroutine ppiclf_user_Torque_driver(i,iStage,taux,tauy,tauz,
+     >                                 taux_hydro,tauy_hydro,tauz_hydro)
 !
       implicit none
 !
