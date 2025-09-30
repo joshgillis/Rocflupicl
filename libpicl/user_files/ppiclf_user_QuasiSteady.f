@@ -448,38 +448,38 @@
 
 ! Internal variables
       integer*4 i
-      real*8 cd, beta, phifRep,
-     >       phip, phif, re
-
+      real*8 cd, beta, phifRep, phip, phif, re
 !
 ! Code:
 
-
       phip = dmax1(rphip,0.0001d0)
       phif = dmax1(rphif,0.0001d0)
-      re  = dmax1(rep,0.1d2)     
-!
+      re  = dmax1(rep,0.1d3)     
+
       phifRep = phif*re
 
       if(phifRep .lt. 1000.0) then
-        cd = 24.0*phifRep**(-1) *(1.0+0.15*(phifRep)**0.687)
-      elseif(phifRep .ge. 1000.0) then
+        cd = 24.0/phifRep *(1.0+0.15*(phifRep)**0.687)
+      else 
         cd = 0.44
-      else
-        print*, "*** Error in Gidaspow Cd choice !!!!!"
-        print*, phif, phip, re, phifRep
-        STOP
+      endif
+
+      if (ppiclf_nid .eq. 0) then
       endif
 
       if(rphif .lt. 0.8) then
-        beta = 150.0*(phip**2*rmu)/(phif*dp**2) 
-     >          + 1.75*(rhof*phip*vmag/dp)
-      elseif(rphif .ge. 0.8) then
-        beta = 0.75*cd*rhof*phif*phip*vmag/(dp*phif**2.65)
-      else
-        print*, "***Error in Gidaspow beta choice!!!!!!"
-        print*, phif, phip, re
-        STOP
+        beta = 150.0*((phip**2)*rmu)/(phif**2 * dp**2)
+     >          + 1.75*(rhof*phip*vmag/(phif*dp))
+      else 
+        beta = 0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
+      endif
+
+      if (ppiclf_nid .eq. 0) then
+        print*, phip, phif, re, rmu, vmag
+        print*, "time, i, cd, beta = ", ppiclf_time, i, cd, beta
+        print*, 150.0*((phip**2)*rmu)/(phif*dp)**2,
+     >          1.75*(rhof*phip*vmag/(phif*dp)),
+     >        0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
       endif
 
       return
