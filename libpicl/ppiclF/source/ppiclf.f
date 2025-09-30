@@ -476,6 +476,7 @@
          if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
          if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
          if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+         if (qs_flag==4) call ppiclf_user_QS_Gidaspow(i,beta,cd)
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
@@ -1557,7 +1558,6 @@
       return
       end
 !-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
 !
 ! Created Feb. 1, 2024
 ! Modified March 5, 2024
@@ -1701,6 +1701,97 @@
 
       return
       end
+!-----------------------------------------------------------------------
+!
+! Created Feb. 1, 2024
+! Modified March 5, 2024
+!
+! Subroutine for quasi-steady force
+!
+! QS Force calculated as a function of Re, Ma and phi
+!
+! Use Osnes etal (2023) correlations
+! A.N. Osnes, M. Vartdal, M. Khalloufi, 
+!    J. Capecelatro, and S. Balachandar.
+! Comprehensive quasi-steady force correlations for compressible flow
+!    through random particle suspensions.
+! International Journal of Multiphase Flow, Vol. 165, 104485, (2023).
+! doi: https://doi.org/10.1016/j.imultiphaseflow.2023.104485.
+!
+! E. Loth, J.T. Daspit, M. Jeong, T. Nagata, and T. Nonomura.
+! Supersonic and hypersonic drag coefficients for a sphere.
+! AIAA Journal, Vol. 59(8), pp. 3261-3274, (2021).
+! doi: https://doi.org/10.2514/1.J060153.
+!
+! NOTE: Re<45 Rarified formula of Loth et al has been redefined by Balachandar
+! to avoid singularity as Ma -> 0.
+!
+!-----------------------------------------------------------------------
+!
+      subroutine ppiclf_user_QS_Gidaspow(i,beta,cd)
+!
+      implicit none
+!
+      include "PPICLF"
+!
+! Internal:
+!
+! Common block: this will be deleted later from the merge with PT
+      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
+     >   collisional_flag, heattransfer_flag, feedback_flag,
+     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
+     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
+     >   qs_fluct_filter_adapt_flag,
+     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
+     >   sbNearest_flag, burnrate_flag, flow_model
+      real*8 :: rmu_ref, tref, suth, ksp, erest
+      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
+     >   collisional_flag, heattransfer_flag, feedback_flag,
+     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
+     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
+     >   qs_fluct_filter_adapt_flag, ksp, erest,
+     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
+     >   sbNearest_flag, burnrate_flag, flow_model
+
+! Internal variables
+      integer*4 i
+      real*8 cd, beta, phifRep,
+     >       phip, phif, re
+
+!
+! Code:
+
+
+      phip = dmax1(rphip,0.0001d0)
+      phif = dmax1(rphif,0.0001d0)
+      re  = dmax1(rep,0.1d2)     
+!
+      phifRep = phif*re
+
+      if(phifRep .lt. 1000.0) then
+        cd = 24.0*phifRep**(-1) *(1.0+0.15*(phifRep)**0.687)
+      elseif(phifRep .ge. 1000.0) then
+        cd = 0.44
+      else
+        print*, "*** Error in Gidaspow Cd choice !!!!!"
+        print*, phif, phip, re, phifRep
+        STOP
+      endif
+
+      if(rphif .lt. 0.8) then
+        beta = 150.0*(phip**2*rmu)/(phif*dp**2) 
+     >          + 1.75*(rhof*phip*vmag/dp)
+      elseif(rphif .ge. 0.8) then
+        beta = 0.75*cd*rhof*phif*phip*vmag/(dp*phif**2.65)
+      else
+        print*, "***Error in Gidaspow beta choice!!!!!!"
+        print*, phif, phip, re
+        STOP
+      endif
+
+      return
+      end
+!-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
 !
 ! Created Feb. 1, 2024
