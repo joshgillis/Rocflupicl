@@ -1214,9 +1214,9 @@ endif
 
          ! Temporarily storing the values in an array for plotting and viewing in ParaView
          ! I should probably delete that later
-         pRegion%mixt%piclDivPhiRSG(1,i) = -DivPhiRSG(1,i)
-         pRegion%mixt%piclDivPhiRSG(2,i) = -DivPhiRSG(2,i)
-         pRegion%mixt%piclDivPhiRSG(3,i) = -DivPhiRSG(3,i)
+         pRegion%mixt%piclDivPhiRSG(1,i) = DivPhiRSG(1,i)
+         pRegion%mixt%piclDivPhiRSG(2,i) = DivPhiRSG(2,i)
+         pRegion%mixt%piclDivPhiRSG(3,i) = DivPhiRSG(3,i)
 
 
 ! Div (\phi_g Q_sg) - comma denotes partial derivative (,3 -> partial / partial x_3)
@@ -1251,20 +1251,20 @@ endif
          ! VALIDATE THAT THIS SHOULD BE POSITIVE INSTEAD
          pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
                           = pRegion%mixt%rhs(CV_MIXT_XMOM,i) &
-                          - DivPhiRSG(XCOORD,i) 
+                          + DivPhiRSG(XCOORD,i) 
          
          pRegion%mixt%rhs(CV_MIXT_YMOM,i) &
                           = pRegion%mixt%rhs(CV_MIXT_YMOM,i) &
-                          - DivPhiRSG(YCOORD,i) 
+                          + DivPhiRSG(YCOORD,i) 
 
          pRegion%mixt%rhs(CV_MIXT_ZMOM,i) &
                           = pRegion%mixt%rhs(CV_MIXT_ZMOM,i) &
-                          - DivPhiRSG(ZCOORD,i)
+                          + DivPhiRSG(ZCOORD,i)
                         
          ! Feedback Div(phi Qsg) to the Fluid Energy Equation
          pRegion%mixt%rhs(CV_MIXT_ENER,i) &
                           = pRegion%mixt%rhs(CV_MIXT_ENER,i) &
-                          - DivPhiQsg(i)
+                          + DivPhiQsg(i)
 
         ENDDO
 
