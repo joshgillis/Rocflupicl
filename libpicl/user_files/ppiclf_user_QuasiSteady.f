@@ -467,7 +467,7 @@
       if (ppiclf_nid .eq. 0) then
       endif
 
-      if(rphif .lt. 0.8) then
+      if(phif .lt. 0.8) then
         beta = 150.0*((phip**2)*rmu)/(phif**2 * dp**2)
      >          + 1.75*(rhof*phip*vmag/(phif*dp))
       else 
@@ -475,11 +475,13 @@
       endif
 
       if (ppiclf_nid .eq. 0) then
-        print*, phip, phif, re, rmu, vmag
+        print*, phip, phif, rhof, re, rmu, vmag
         print*, "time, i, cd, beta = ", ppiclf_time, i, cd, beta
-        print*, 150.0*((phip**2)*rmu)/(phif*dp)**2,
-     >          1.75*(rhof*phip*vmag/(phif*dp)),
-     >        0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
+        print*, "i, fqsx, fqsy, fqsz =", i, vx*beta, vy*beta, vz*beta
+        print*, "term 1", 150.0*((phip**2)*rmu)/(phif*dp)**2,
+     >          "term 2", 1.75*(rhof*phip*vmag/(phif*dp)),
+     >          "term 3", 0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
+        print*, "==============================================="
       endif
 
       return
