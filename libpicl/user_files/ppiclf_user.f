@@ -471,10 +471,19 @@
 !
 ! Step 2: Force component quasi-steady
 !
-         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
-         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
-         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
-         if (qs_flag==4) call ppiclf_user_QS_Gidaspow(i,beta,cd)
+         if (qs_flag==1) then 
+           call ppiclf_user_QS_Parmar(i,beta,cd)
+         else if (qs_flag==2) then 
+           call ppiclf_user_QS_Osnes (i,beta,cd)
+         else if (qs_flag==3) then 
+           call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+         else if (qs_flag==4) then 
+           call ppiclf_user_QS_Gidaspow(i,beta,cd)
+         else
+           print*, "***PPICLF: Error in QS Model Selection!"   
+           call ppiclf_exittr('Wrong QS Model Choice$', 0.0, 0)
+         endif
+
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz

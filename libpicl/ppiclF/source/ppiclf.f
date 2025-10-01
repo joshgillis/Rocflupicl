@@ -473,10 +473,19 @@
 !
 ! Step 2: Force component quasi-steady
 !
-         if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta,cd)
-         if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta,cd)
-         if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
-         if (qs_flag==4) call ppiclf_user_QS_Gidaspow(i,beta,cd)
+         if (qs_flag==1) then 
+           call ppiclf_user_QS_Parmar(i,beta,cd)
+         else if (qs_flag==2) then 
+           call ppiclf_user_QS_Osnes (i,beta,cd)
+         else if (qs_flag==3) then 
+           call ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+         else if (qs_flag==4) then 
+           call ppiclf_user_QS_Gidaspow(i,beta,cd)
+         else
+           print*, "***PPICLF: Error in QS Model Selection!"   
+           call ppiclf_exittr('Wrong QS Model Choice$', 0.0, 0)
+         endif
+
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
@@ -1761,7 +1770,7 @@
 
       phip = dmax1(rphip,0.0001d0)
       phif = dmax1(rphif,0.0001d0)
-      re  = dmax1(rep,0.1d3)     
+      re  = dmax1(rep,0.1d2)     
 
       phifRep = phif*re
 
@@ -1771,24 +1780,14 @@
         cd = 0.44
       endif
 
-      if (ppiclf_nid .eq. 0) then
-      endif
-
       if(phif .lt. 0.8) then
-        beta = 150.0*((phip**2)*rmu)/(phif**2 * dp**2)
-     >          + 1.75*(rhof*phip*vmag/(phif*dp))
+        beta = 150.0*((phip**2)*rmu)/(phif * dp**2)
+     >          + 1.75*(rhof*phip*vmag/dp)
       else 
-        beta = 0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
+        beta = 0.75*cd*phip*phif*rhof*vmag/(dp*phif**2.65)
       endif
 
-      if (ppiclf_nid .eq. 0) then
-        print*, phip, phif, rhof, re, rmu, vmag
-        print*, "time, i, cd, beta = ", ppiclf_time, i, cd, beta
-        print*, "i, fqsx, fqsy, fqsz =", i, vx*beta, vy*beta, vz*beta
-        print*, 150.0*((phip**2)*rmu)/(phif*dp)**2,
-     >          1.75*(rhof*phip*vmag/(phif*dp)),
-     >        0.75*cd*phip*rhof*vmag/(dp*phif**2.65)
-      endif
+      beta = (rpi*dp**3)/(6.0*phip)
 
       return
       end
