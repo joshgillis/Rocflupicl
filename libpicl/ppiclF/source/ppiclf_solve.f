@@ -2743,7 +2743,9 @@ c     ndum    = ppiclf_nee*n
             ppiclf_iprop(1,i) = flag(1,k)
             do j=1,PPICLF_LRP_INT
                jp = PPICLF_INT_MAP(j)
-               ppiclf_rprop(jp,i) = coord(7+j,k)
+               if(jp .gt. 0) then
+                 ppiclf_rprop(jp,i) = coord(7+j,k)
+               endif
             ENDdo
          ENDif
       ENDdo
