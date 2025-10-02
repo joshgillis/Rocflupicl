@@ -473,9 +473,11 @@
          if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta)
          if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta)
          if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta)
+
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
+
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
