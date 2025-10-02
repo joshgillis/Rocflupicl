@@ -1712,29 +1712,14 @@
       end
 !-----------------------------------------------------------------------
 !
-! Created Feb. 1, 2024
-! Modified March 5, 2024
+! Created Sep. 29, 2025
+!      
+! Subroutine for Quasi-Steady Drag Model of Gidaspow 
 !
-! Subroutine for quasi-steady force
+! D. Gidaspow, Multiphase Flow and Fluidization (Academic Press, 1994)
 !
-! QS Force calculated as a function of Re, Ma and phi
-!
-! Use Osnes etal (2023) correlations
-! A.N. Osnes, M. Vartdal, M. Khalloufi, 
-!    J. Capecelatro, and S. Balachandar.
-! Comprehensive quasi-steady force correlations for compressible flow
-!    through random particle suspensions.
-! International Journal of Multiphase Flow, Vol. 165, 104485, (2023).
-! doi: https://doi.org/10.1016/j.imultiphaseflow.2023.104485.
-!
-! E. Loth, J.T. Daspit, M. Jeong, T. Nagata, and T. Nonomura.
-! Supersonic and hypersonic drag coefficients for a sphere.
-! AIAA Journal, Vol. 59(8), pp. 3261-3274, (2021).
-! doi: https://doi.org/10.2514/1.J060153.
-!
-! NOTE: Re<45 Rarified formula of Loth et al has been redefined by Balachandar
-! to avoid singularity as Ma -> 0.
-!
+! Note: Model is provided per cell volume. We convert that to per
+! particle using the particle volume fraction and volume
 !-----------------------------------------------------------------------
 !
       subroutine ppiclf_user_QS_Gidaspow(i,beta,cd)
@@ -1770,7 +1755,7 @@
 
       phip = dmax1(rphip,0.0001d0)
       phif = dmax1(rphif,0.0001d0)
-      re  = dmax1(rep,0.1d2)     
+      re  = dmax1(rep,0.1d0)     
 
       phifRep = phif*re
 
@@ -1784,10 +1769,10 @@
         beta = 150.0*((phip**2)*rmu)/(phif * dp**2)
      >          + 1.75*(rhof*phip*vmag/dp)
       else 
-        beta = 0.75*cd*phip*phif*rhof*vmag/(dp*phif**2.65)
+        beta = 0.75*cd*phip*rhof*vmag/(dp*phif**1.65)
       endif
 
-      beta = (rpi*dp**3)/(6.0*phip)
+      beta = beta*(rpi*dp**3)/(6.0*phip)
 
       return
       end
