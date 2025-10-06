@@ -105,9 +105,20 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
 
 ! y, y1, ydot, ydotc: 12
 
-! rprop: 64
+! rprop: 48
 
-! map: 10
+! rprop4: PPICLF_LRP4 - Reynolds Subgrid Stress Components
+
+! rprop5: PPICLF_LRP5 - Storing Force Models
+
+! map: 22
+!--- x,y,z Forces Fedback to Rocflu
+!---
+!--- Add comment about these terms 
+!--- Reynolds Subgrid Stress Tensor
+!--- Pseudo Turbulent Kinetic Energy
+
+
 
 
 
@@ -192,6 +203,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
   REAL(RFREAL), DIMENSION(:,:), POINTER :: pCvSpec
   TYPE(t_spec_input), POINTER :: pSpecInput  
   TYPE(t_spec_type), POINTER :: pSpecType
+  REAL(RFREAL) :: ksg
 
 ! ******************************************************************************
 ! Start
@@ -257,7 +269,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
           IF ( global%solverType == SOLV_IMPLICIT_HM ) THEN
             IF ( pRegion%mixtInput%flowModel == FLOW_NAVST ) THEN
               IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_DUVWP ) THEN 
-                CALL ErrorStop(global,ERR_CV_STATE_INVALID,238)
+                CALL ErrorStop(global,ERR_CV_STATE_INVALID,239)
               END IF ! pRegion%mixt%cvState    
 
               DO icg = icgBeg,icgEnd
@@ -271,7 +283,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
             END IF ! pRegion%mixtInput%flowModel
           ELSE
             IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN 
-              CALL ErrorStop(global,ERR_CV_STATE_INVALID,252)
+              CALL ErrorStop(global,ERR_CV_STATE_INVALID,253)
             END IF ! pRegion%mixt%cvState    
 
             DO icg = icgBeg,icgEnd
@@ -286,6 +298,8 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                            pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                            pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
 
+              ksg = 0.0_RFREAL
+
               ! Subbu - Debug
               IF (global%plagUsed .EQV. .TRUE.) THEN
                  r = r/(1.0_RFREAL - pRegion%plag%vFracE(1,indVFracE*icg))
@@ -298,7 +312,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
 
               END IF
 
-              pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2)
+              pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2,ksg)
               pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_DPR(r,pDv(DV_MIXT_PRES,icg),gc)
               pDv(DV_MIXT_SOUN,icg) = MixtPerf_C_GRT(g,gc,pDv(DV_MIXT_TEMP,icg))    
             END DO ! icg
@@ -312,7 +326,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
           IF ( global%solverType == SOLV_IMPLICIT_HM ) THEN
             IF ( pRegion%mixtInput%flowModel == FLOW_NAVST ) THEN
               IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_DUVWP ) THEN 
-                CALL ErrorStop(global,ERR_CV_STATE_INVALID,295)
+                CALL ErrorStop(global,ERR_CV_STATE_INVALID,298)
               END IF ! pRegion%mixt%cvState    
 
               DO icg = icgBeg,icgEnd
@@ -326,7 +340,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
             END IF ! pRegion%mixtInput%flowModel
           ELSE
             IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN 
-              CALL ErrorStop(global,ERR_CV_STATE_INVALID,309)
+              CALL ErrorStop(global,ERR_CV_STATE_INVALID,312)
             END IF ! pRegion%mixt%cvState    
 
             IF ( (global%pbaFlag .EQV. .FALSE.) .OR. &
@@ -343,6 +357,8 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                 Vm2 = ir*ir*(pCv(CV_MIXT_XMOM,icg)*pCv(CV_MIXT_XMOM,icg) + &
                              pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                              pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
+                
+                ksg = 0.0_RFREAL
 
                 IF (global%plagUsed .EQV. .TRUE.) THEN
                 r = r/(1.0_RFREAL - pRegion%plag%vFracE(1,indVFracE*icg))          
@@ -352,14 +368,14 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                    r  = r/(1.0_RFREAL - pRegion%mixt%piclVF(icg))
 
                 END IF
-                pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2)
+                pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2,ksg)
                 pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_DPR(r,pDv(DV_MIXT_PRES,icg),gc)
                 pDv(DV_MIXT_SOUN,icg) = MixtPerf_C_GRT(g,gc,pDv(DV_MIXT_TEMP,icg))    
               END DO ! icg
             ELSE
 ! ----------- Program burn -----------------------------------------------------          
               IF ( global%specUsed .EQV. .FALSE. ) THEN
-                CALL ErrorStop(global,ERR_REACHED_DEFAULT,345) ! Defensive coding
+                CALL ErrorStop(global,ERR_REACHED_DEFAULT,350) ! Defensive coding
               END IF ! global%specUsed
 
 !             RFLU_SetDependentVars is called from rfluinit and hence spec%cv is
@@ -395,6 +411,8 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                 Vm2 = ir*ir*(pCv(CV_MIXT_XMOM,icg)*pCv(CV_MIXT_XMOM,icg) + &
                              pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                              pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
+                
+                ksg = 0.0_RFREAL
 
                 IF (global%plagUsed .EQV. .TRUE.) THEN
                 r = r/(1.0_RFREAL - pRegion%plag%vFracE(1,indVFracE*icg))
@@ -417,7 +435,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
 !    Changing definition of sound speed to that given in paper
 ! END DEBUG                
                 IF ( ABS(YExplosive) < nTol ) THEN
-                  pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2)
+                  pDv(DV_MIXT_PRES,icg) = MixtPerf_P_DEoGVm2(r,Eo,g,Vm2,ksg)
                   pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_DPR(r,pDv(DV_MIXT_PRES,icg),gc)
                   pDv(DV_MIXT_SOUN,icg) = MixtPerf_C_GRT(g,gc,pDv(DV_MIXT_TEMP,icg))    
                 ELSEIF ( ABS(1.0_RFREAL-YExplosive) < nTol ) THEN
@@ -435,7 +453,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                   pDv(DV_MIXT_SOUN,icg) = SQRT(pDv(DV_MIXT_PRES,icg)/pCv(CV_MIXT_DENS,icg))
 !                  pDv(DV_MIXT_SOUN,icg) = MixtPerf_C_GRT(g,gc,pDv(DV_MIXT_TEMP,icg))    
                 ELSE
-                  pDv(DV_MIXT_PRES,icg) = YProducts*MixtPerf_P_DEoGVm2(r,Eo,gProducts,Vm2)
+                  pDv(DV_MIXT_PRES,icg) = YProducts*MixtPerf_P_DEoGVm2(r,Eo,gProducts,Vm2,ksg)
                   pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_DPR(r,pDv(DV_MIXT_PRES,icg),gcProducts)
                   pDv(DV_MIXT_SOUN,icg) = SQRT((pDv(DV_MIXT_PRES,icg)/pCv(CV_MIXT_DENS,icg))* &
                                           (1.0_RFREAL+(gProducts-1.0_RFREAL)*YProducts))
@@ -455,7 +473,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
       
         CASE ( GAS_MODEL_MIXT_PSEUDO ) 
           IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN 
-            CALL ErrorStop(global,ERR_CV_STATE_INVALID,447)
+            CALL ErrorStop(global,ERR_CV_STATE_INVALID,454)
           END IF ! pRegion%mixt%cvState    
 
           DO icg = icgBeg,icgEnd
@@ -490,8 +508,10 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
             Vm2 = ir*ir*(pCv(CV_MIXT_XMOM,icg)*pCv(CV_MIXT_XMOM,icg) + &
                          pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                          pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
+            
+            ksg = 0.0_RFREAL
 
-            term = MixtPerf_P_DEoGVm2(r,Eo,gm,Vm2)
+            term = MixtPerf_P_DEoGVm2(r,Eo,gm,Vm2,ksg)
             pDv(DV_MIXT_PRES,icg) = cpm/cpg*term/(1.0_RFREAL-phip)
             
             term = MixtPerf_T_DPR(r,pDv(DV_MIXT_PRES,icg),gcm)            
@@ -507,7 +527,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
       
         CASE ( GAS_MODEL_MIXT_GASLIQ ) 
           IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN 
-            CALL ErrorStop(global,ERR_CV_STATE_INVALID,503)
+            CALL ErrorStop(global,ERR_CV_STATE_INVALID,512)
           END IF ! pRegion%mixt%cvState  
 
           ro  = global%refDensityLiq
@@ -538,8 +558,10 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                          pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                          pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
             Cvm = (rYl*cvl + rYv*cvv + rYg*cvg)/r
+          
+            ksg = 0.0_RFREAL
 
-            pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_CvEoVm2(Cvm,Eo,Vm2) 
+            pDv(DV_MIXT_TEMP,icg) = MixtPerf_T_CvEoVm2(Cvm,Eo,Vm2,ksg) 
 
             Cl2 = MixtLiq_C2_Bp(Bp) 
             Cv2 = MixtPerf_C2_GRT(1.0_RFREAL,gcv,pDv(DV_MIXT_TEMP,icg))
@@ -575,7 +597,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
         CASE ( GAS_MODEL_MIXT_JWL ) 
           IF ( global%specUsed .EQV. .TRUE. ) THEN
             IF ( pRegion%mixt%cvState /= CV_MIXT_STATE_CONS ) THEN 
-              CALL ErrorStop(global,ERR_CV_STATE_INVALID,575)
+              CALL ErrorStop(global,ERR_CV_STATE_INVALID,586)
             END IF ! pRegion%mixt%cvState    
 
 !           RFLU_SetDependentVars is called from rfluinit and hence spec%cv is
@@ -600,6 +622,8 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
             DO icg = icgBeg,icgEnd
               gc = MixtPerf_R_M(pGv(GV_MIXT_MOL,icg))
               g  = MixtPerf_G_CpR(pGv(GV_MIXT_CP,icg),gc)
+              
+              ksg = 0.0_RFREAL
 
               r  = pCv(CV_MIXT_DENS,icg)
               ir = 1.0_RFREAL/r
@@ -609,7 +633,7 @@ SUBROUTINE RFLU_SetDependentVars(pRegion,icgBeg,icgEnd)
                            pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                            pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
 
-              e  = Eo - 0.5_RFREAL*Vm2
+              e  = Eo - 0.5_RFREAL*Vm2 - ksg
 
               ! BRAD Pressure fix
               IF (global%plagUsed .EQV. .TRUE.) THEN
@@ -634,9 +658,9 @@ Vm2 = ir*ir*(pCv(CV_MIXT_XMOM,icg)*pCv(CV_MIXT_XMOM,icg) + &
                            pCv(CV_MIXT_YMOM,icg)*pCv(CV_MIXT_YMOM,icg) + &
                            pCv(CV_MIXT_ZMOM,icg)*pCv(CV_MIXT_ZMOM,icg))
 
-  pCv(CV_MIXT_ENER,icg) = r*(e+0.5_RFREAL*(Vm2))
+  pCv(CV_MIXT_ENER,icg) = r*(e+0.5_RFREAL*(Vm2)+ksg)
 
-          !CALL ErrorStop(global,ERR_REACHED_DEFAULT,640)
+          !CALL ErrorStop(global,ERR_REACHED_DEFAULT,653)
 END IF
 endif !(1.eq.2)
 !!!!!!!!!!!!!!!
@@ -692,7 +716,7 @@ write(*,*) 'Dep Vars: X,Y',pRegion%grid%cofg(XCOORD,icg),pRegion%grid%cofg(YCOOR
 
 !  pCv(CV_MIXT_ENER,icg) = r*(e+0.5_RFREAL*(Vm2))
 
-          CALL ErrorStop(global,ERR_REACHED_DEFAULT,698) 
+          CALL ErrorStop(global,ERR_REACHED_DEFAULT,711) 
 END IF
 
 IF (e .LE. 0.0_RFREAL) THEN
@@ -700,8 +724,8 @@ IF (e .LE. 0.0_RFREAL) THEN
 !write(*,*) icg,r,pCv(CV_MIXT_ENER,icg),pCv(CV_MIXT_XMOM,icg),pCv(CV_MIXT_YMOM,icg),e,&
 !        pRegion%grid%cofg(XCOORD,icg),pRegion%grid%cofg(YCOORD,icg)
   e = 1.0E+04_RFREAL 
-  pCv(CV_MIXT_ENER,icg) = r*(e+0.5_RFREAL*(Vm2)) !Vm2 was uu+vv+ww 
-!          CALL ErrorStop(global,ERR_REACHED_DEFAULT,707) 
+  pCv(CV_MIXT_ENER,icg) = r*(e+0.5_RFREAL*(Vm2)+ksg) !Vm2 was uu+vv+ww 
+!          CALL ErrorStop(global,ERR_REACHED_DEFAULT,720) 
 END IF !e le 0
 !!!!!!!!!!!!!!!
 
@@ -739,7 +763,7 @@ END IF !e le 0
 
               end if
 
-              pCv(CV_MIXT_ENER,icg)  = r*(e+0.5_RFREAL*Vm2)*(1.0_RFREAL -&
+              pCv(CV_MIXT_ENER,icg)  = r*(e+0.5_RFREAL*Vm2+ksg)*(1.0_RFREAL -&
                                 pRegion%mixt%piclVF(icg))
 
               pCvSpec(iCvSpecProducts,icg) = YProducts
@@ -761,7 +785,7 @@ END IF !e le 0
 ! ------------------------------------------------------------------------------     
 
         CASE DEFAULT
-          CALL ErrorStop(global,ERR_REACHED_DEFAULT,772) 
+          CALL ErrorStop(global,ERR_REACHED_DEFAULT,785) 
       END SELECT ! pRegion%mixtInput%gasModel
 
 ! ==============================================================================  
@@ -769,7 +793,7 @@ END IF !e le 0
 ! ==============================================================================  
 
     CASE DEFAULT 
-      CALL ErrorStop(global,ERR_REACHED_DEFAULT,780)
+      CALL ErrorStop(global,ERR_REACHED_DEFAULT,793)
   END SELECT ! pRegion%mixtInput%fluidModel 
 
 ! ******************************************************************************

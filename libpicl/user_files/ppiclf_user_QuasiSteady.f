@@ -19,7 +19,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Parmar(i,beta,cd)
+      subroutine ppiclf_user_QS_Parmar(i,beta)
 !
       implicit none
 !
@@ -27,24 +27,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr
 
@@ -142,7 +126,7 @@
 !   Reynolds numbers and volume fractions. 
 !
 !-----------------------------------------------------------------------
-      subroutine ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+      subroutine ppiclf_user_QS_ModifiedParmar(i,beta)
 !
       implicit none
 !
@@ -150,24 +134,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr,
      >   b1,b2,b3
@@ -277,7 +245,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Osnes(i,beta,cd)
+      subroutine ppiclf_user_QS_Osnes(i,beta)
 !
       implicit none
 !
@@ -285,24 +253,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re,Knp,fKn,CD1,s,JM,CD2,
+      real*8 gamma,Knp,fKn,CD1,s,JM,CD2,
      >   cd_loth,CM,GM,HM,b1,b2,b3,cd,beta
       real*8 sgby2, JMt
 
@@ -413,31 +365,14 @@
       include "PPICLF"
 !
 ! Internal:
-!
-! Common block: this will be deleted later from the merge with PT
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
 
 ! Internal variables
       integer*4 i
-      real*8 cd, beta, phifRep, phip, phif, re
+      real*8 cd, beta, phifRep, phif
 !
 ! Code:
 
-      phip = dmax1(rphip,0.0001d0)
+      phi  = dmax1(rphip,0.0001d0)
       phif = dmax1(rphif,0.0001d0)
       re  = dmax1(rep,0.1d0)     
 
@@ -450,13 +385,13 @@
       endif
 
       if(phif .lt. 0.8) then
-        beta = 150.0*((phip**2)*rmu)/(phif * dp**2)
-     >          + 1.75*(rhof*phip*vmag/dp)
+        beta = 150.0*((phi**2)*rmu)/(phif * dp**2)
+     >          + 1.75*(rhof*phi*vmag/dp)
       else 
-        beta = 0.75*cd*phip*rhof*vmag/(dp*phif**1.65)
+        beta = 0.75*cd*phi*rhof*vmag/(dp*phif**1.65)
       endif
 
-      beta = beta*(rpi*dp**3)/(6.0*phip)
+      beta = beta*(rpi*dp**3)/(6.0*phi)
 
       return
       end

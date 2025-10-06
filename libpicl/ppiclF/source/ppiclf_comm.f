@@ -1049,7 +1049,7 @@ c-----------------------------------------------------------------------
       logical partl    
       integer*4 lrf
       parameter(lrf = PPICLF_LRS*4 + PPICLF_LRP + PPICLF_LRP2
-     >       + PPICLF_LRP3)
+     >       + PPICLF_LRP3 + PPICLF_LRP4 + PPICLF_LRP5)
       real*8 rwork(lrf,PPICLF_LPART)
       integer*4 i, ic, j0
 !
@@ -1070,6 +1070,10 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop2(1,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop3(1,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(rwork(ic,i),ppiclf_rprop4(1,i),PPICLF_LRP4)
+         ic = ic + PPICLF_LRP4
+         call ppiclf_copy(rwork(ic,i),ppiclf_rprop5(1,i),PPICLF_LRP5)
       enddo
 
       j0 = 4
@@ -1099,6 +1103,10 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(ppiclf_rprop2(1,i),rwork(ic,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(ppiclf_rprop3(1,i),rwork(ic,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(ppiclf_rprop4(1,i),rwork(ic,i),PPICLF_LRP4)
+         ic = ic + PPICLF_LRP4
+         call ppiclf_copy(ppiclf_rprop5(1,i),rwork(ic,i),PPICLF_LRP5)
       enddo
         
       return
@@ -1183,7 +1191,8 @@ c CREATING GHOST PARTICLES
       do ip=1,ppiclf_npart
 
          call ppiclf_user_MapProjPart(map,ppiclf_y(1,ip)
-     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip))
+     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip),
+     >                                              ppiclf_rprop4(1,ip))
 
 c        idum = 1
 c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)

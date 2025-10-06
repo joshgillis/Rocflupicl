@@ -13,6 +13,10 @@
 #endif
 #define PPICLF_LRP3 6*PPICLF_VU
 
+#define PPICLF_LRP4 12
+
+#define PPICLF_LRP5 19
+
 #ifndef PPICLF_LIP
 #define PPICLF_LIP 11
 #endif

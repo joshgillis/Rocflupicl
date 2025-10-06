@@ -43,22 +43,7 @@
       include "PPICLF"
 !
 ! Internal:
-!
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+!      
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -69,6 +54,7 @@
       real*8 fqsx, fqsy, fqsz
       real*8 fqsforce
       real*8 fqs_fluct(3)
+      real*8 xi_par, xi_perp, xi_T
       real*8 famx, famy, famz 
       real*8 fdpdx, fdpdy, fdpdz
       real*8 fdpvdx, fdpvdy, fdpvdz
@@ -83,12 +69,10 @@
       real*8 factor, rcp_fluid, rmass_add
 
       real*8 gkern
-  
-!-----------------------------------------------------------------------
-      ! Thierry - 06/27/204 - added mass variables declaration
+
+! Needed for Added mass calculation
       integer*4 j, l
       real*8 SDrho
-!-----------------------------------------------------------------------
 
       real*8 vgradrhog
       integer*4 i, n, ic, k
@@ -305,7 +289,6 @@
 !
 !-----------------------------------------------------------------------
 !
-!
 ! Evaluate ydot, the rhs of the equations of motion
 ! for the particles
 !
@@ -346,7 +329,21 @@
          ! TLJ - 04/03/2025; Do not calculate forces if vmag = 0
          !       Otherwise the particles might move before the 
          !       shock arrives
-         if (vmag <= 1.d-8) cycle
+         !if (vmag <= 1.d-8) cycle
+         
+         ! 08/08/2025 - Thierry  - 1.d-8 is very small
+         if (vmag <= 1.d-3) cycle
+
+
+         ! Thierry - at initial times when rmachp and vmag are very
+         ! small, we would get very large CD (>100)
+         ! This leads to NaN projected force when PseudoTurbulence is 
+         ! enabled. One fix I'm trying is to cycle when rmachp and vmag
+         ! are small
+
+         ! Thierry - seeing if that fixes the issue of very large CD
+         ! initially 
+         !if(vmag .lt. 1.0 .or. rmachp .lt. 1.d-3) cycle
 
          ! TLJ - redefined rprop(PPICLF_R_JSPT,i) to be the particle
          !   velocity magnitude for plotting purposes - 01/03/2025
@@ -387,7 +384,8 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-
+         !--- Added for PseudoTurbulence
+         Rsg = 0.0d0; T_par = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -411,7 +409,8 @@
 ! Step 1b: Call NearestNeighbor if particles i and j interact
 !
          if ((am_flag==2).or.(collisional_flag>=1)
-     >          .or.(qs_fluct_flag>=1)) then
+     >          .or.(qs_fluct_flag>=1)
+     >          .or.(pseudoTurb_flag==1)) then
 
          if ((qs_fluct_flag>=1) .and. (vmag .gt. 1.d-8)) then
             ! Compute mean for particle i
@@ -455,8 +454,8 @@
                w2pmean  = gkern*(ppiclf_y(PPICLF_JVZ,i)**2)*
      >                    ppiclf_rprop(PPICLF_R_JVOLP,i)
                icpmean = 1
-            end if
-         end if
+            end if 
+         end if ! qs_fluct_flag .and. vmag
 
          ! add neighbors
          IF ( sbNearest_flag .EQ. 1) THEN
@@ -487,7 +486,6 @@
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
-
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
@@ -495,8 +493,10 @@
          !   and is called above in Step 1b
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
-         elseif (qs_fluct_flag==2) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct)
+         elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,xi_T,
+     >                                      fqsx, fqsy, fqsz)
          endif
 
          ! Add fluctuation part to quasi-steady force
@@ -508,6 +508,11 @@
          ppiclf_rprop(PPICLF_R_FLUCTFX,i) = fqs_fluct(1)
          ppiclf_rprop(PPICLF_R_FLUCTFY,i) = fqs_fluct(2)
          ppiclf_rprop(PPICLF_R_FLUCTFZ,i) = fqs_fluct(3)
+         
+         ! Store normally distributed random variables xi for PseudoTurbulence
+         ppiclf_rprop(PPICLF_R_XIPAR,i)  = xi_par
+         ppiclf_rprop(PPICLF_R_XIPERP,i) = xi_perp
+         ppiclf_rprop(PPICLF_R_XIT,i) = xi_T
 
 !
 ! Step 4: Force component added mass
@@ -642,7 +647,7 @@
 
 !
 ! Step 10: Set ydot for all PPICLF_SLN number of equations
-!
+
          ppiclf_ydot(PPICLF_JX ,i) = ppiclf_y(PPICLF_JVX,i)
          ppiclf_ydot(PPICLF_JY ,i) = ppiclf_y(PPICLF_JVY,i)
          ppiclf_ydot(PPICLF_JZ, i) = ppiclf_y(PPICLF_JVZ,i)
@@ -702,6 +707,17 @@
      >         (ppiclf_ydot(PPICLF_JVZ,i)*rmass - fcz)
 
             ! Energy equation feedback term
+            if(pseudoTurb_flag==1) then
+            ! 09/02/2025 -  Addition of PTKE to Rocflu's Energy Equation
+              ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i)*
+     >         ( (fqsx+fvux+famx+liftx)*ppiclf_y(PPICLF_JVX,i) + 
+     >           (fqsy+fvuy+famy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
+     >           (fqsz+fvuz+famz+liftz)*ppiclf_y(PPICLF_JVZ,i) +
+     >           qq )
+
+            else ! Pseudo Turbulence is OFF
+            ! 09/19/2025 - Thierry - Added Lift force
+            ! Still need to add Torue \cdot angular velocity
             ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i) *
      >         ( (fqsx+fvux+liftx)*ppiclf_y(PPICLF_JVX,i) + 
      >           (fqsy+fvuy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
@@ -713,8 +729,29 @@
      >                  tauy_hydro*ppiclf_y(PPICLF_JOY,i) +
      >                  tauz_hydro*ppiclf_y(PPICLF_JOZ,i) +
      >           qq )
+
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
-         endif 
+            endif ! pseudoTurb_flag
+
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! We need to store the tensor calculations here in a certain array and then
+      ! access that in the mapping subroutine for when projection is needed
+
+            ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
+            ppiclf_rprop4(PPICLF_R_JRSG12,i) = Rsg(1,2)
+            ppiclf_rprop4(PPICLF_R_JRSG13,i) = Rsg(1,3)
+            ppiclf_rprop4(PPICLF_R_JRSG21,i) = Rsg(2,1)
+            ppiclf_rprop4(PPICLF_R_JRSG22,i) = Rsg(2,2)
+            ppiclf_rprop4(PPICLF_R_JRSG23,i) = Rsg(2,3)
+            ppiclf_rprop4(PPICLF_R_JRSG31,i) = Rsg(3,1)
+            ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
+            ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
+            
+            ppiclf_rprop4(PPICLF_R_JTSG1,i) = T_par(1)
+            ppiclf_rprop4(PPICLF_R_JTSG2,i) = T_par(2)
+            ppiclf_rprop4(PPICLF_R_JTSG3,i) = T_par(3)
+            
+         endif ! feedback_flag
 
 !
 ! Step 12: If stationary, don't move particles. Feedback can still be on
@@ -752,25 +789,26 @@
 !
 ! Step 13: Store forces
 !
-         ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
-         ppiclf_rprop(PPICLF_R_FQSY,i)  = fqsy
-         ppiclf_rprop(PPICLF_R_FQSZ,i)  = fqsz
-         ppiclf_rprop(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
-         ppiclf_rprop(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
-         ppiclf_rprop(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
-         ppiclf_rprop(PPICLF_R_FAMBX,i) = FamBinary(1)
-         ppiclf_rprop(PPICLF_R_FAMBY,i) = FamBinary(2)
-         ppiclf_rprop(PPICLF_R_FAMBZ,i) = FamBinary(3)
-         ppiclf_rprop(PPICLF_R_FCX,i)   = fcx
-         ppiclf_rprop(PPICLF_R_FCY,i)   = fcy
-         ppiclf_rprop(PPICLF_R_FCZ,i)   = fcz
-         ppiclf_rprop(PPICLF_R_FVUX,i)  = fvux
-         ppiclf_rprop(PPICLF_R_FVUY,i)  = fvuy
-         ppiclf_rprop(PPICLF_R_FVUZ,i)  = fvuz
-         ppiclf_rprop(PPICLF_R_QQ,i)    = qq
-         ppiclf_rprop(PPICLF_R_FPGX,i)  = fdpdx
-         ppiclf_rprop(PPICLF_R_FPGY,i)  = fdpdy
-         ppiclf_rprop(PPICLF_R_FPGZ,i)  = fdpdz
+         ! Thierry - just testing this for now to see if it makes a difference in R_perp
+         ppiclf_rprop5(PPICLF_R_FQSX,i)  = fqsx
+         ppiclf_rprop5(PPICLF_R_FQSY,i)  = fqsy
+         ppiclf_rprop5(PPICLF_R_FQSZ,i)  = fqsz
+         ppiclf_rprop5(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
+         ppiclf_rprop5(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
+         ppiclf_rprop5(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
+         ppiclf_rprop5(PPICLF_R_FAMBX,i) = FamBinary(1)
+         ppiclf_rprop5(PPICLF_R_FAMBY,i) = FamBinary(2)
+         ppiclf_rprop5(PPICLF_R_FAMBZ,i) = FamBinary(3)
+         ppiclf_rprop5(PPICLF_R_FCX,i)   = fcx
+         ppiclf_rprop5(PPICLF_R_FCY,i)   = fcy
+         ppiclf_rprop5(PPICLF_R_FCZ,i)   = fcz
+         ppiclf_rprop5(PPICLF_R_FVUX,i)  = fvux
+         ppiclf_rprop5(PPICLF_R_FVUY,i)  = fvuy
+         ppiclf_rprop5(PPICLF_R_FVUZ,i)  = fvuz
+         ppiclf_rprop5(PPICLF_R_QQ,i)    = qq
+         ppiclf_rprop5(PPICLF_R_FPGX,i)  = fdpdx
+         ppiclf_rprop5(PPICLF_R_FPGY,i)  = fdpdy
+         ppiclf_rprop5(PPICLF_R_FPGZ,i)  = fdpdz
 
 !
 ! Step 14: If debug mode is ON, calculate and print the max values.

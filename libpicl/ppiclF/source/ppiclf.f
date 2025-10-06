@@ -45,22 +45,7 @@
       include "PPICLF"
 !
 ! Internal:
-!
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
+!      
       real*8 :: ppiclf_rcp_part, ppiclf_p0
       integer :: ppiclf_moveparticle
       CHARACTER(12) :: ppiclf_matname
@@ -71,6 +56,7 @@
       real*8 fqsx, fqsy, fqsz
       real*8 fqsforce
       real*8 fqs_fluct(3)
+      real*8 xi_par, xi_perp, xi_T
       real*8 famx, famy, famz 
       real*8 fdpdx, fdpdy, fdpdz
       real*8 fdpvdx, fdpvdy, fdpvdz
@@ -85,12 +71,10 @@
       real*8 factor, rcp_fluid, rmass_add
 
       real*8 gkern
-  
-!-----------------------------------------------------------------------
-      ! Thierry - 06/27/204 - added mass variables declaration
+
+! Needed for Added mass calculation
       integer*4 j, l
       real*8 SDrho
-!-----------------------------------------------------------------------
 
       real*8 vgradrhog
       integer*4 i, n, ic, k
@@ -307,7 +291,6 @@
 !
 !-----------------------------------------------------------------------
 !
-!
 ! Evaluate ydot, the rhs of the equations of motion
 ! for the particles
 !
@@ -348,7 +331,21 @@
          ! TLJ - 04/03/2025; Do not calculate forces if vmag = 0
          !       Otherwise the particles might move before the 
          !       shock arrives
-         if (vmag <= 1.d-8) cycle
+         !if (vmag <= 1.d-8) cycle
+         
+         ! 08/08/2025 - Thierry  - 1.d-8 is very small
+         if (vmag <= 1.d-3) cycle
+
+
+         ! Thierry - at initial times when rmachp and vmag are very
+         ! small, we would get very large CD (>100)
+         ! This leads to NaN projected force when PseudoTurbulence is 
+         ! enabled. One fix I'm trying is to cycle when rmachp and vmag
+         ! are small
+
+         ! Thierry - seeing if that fixes the issue of very large CD
+         ! initially 
+         !if(vmag .lt. 1.0 .or. rmachp .lt. 1.d-3) cycle
 
          ! TLJ - redefined rprop(PPICLF_R_JSPT,i) to be the particle
          !   velocity magnitude for plotting purposes - 01/03/2025
@@ -389,7 +386,8 @@
          upmean = 0.0; vpmean = 0.0; wpmean = 0.0;
          u2pmean = 0.0; v2pmean = 0.0; w2pmean = 0.0;
          fdpvdx = 0.0d0; fdpvdy = 0.0d0; fdpvdz = 0.0d0;
-
+         !--- Added for PseudoTurbulence
+         Rsg = 0.0d0; T_par = 0.0d0
 
 !
 ! Step 1a: New Added-Mass model of Briney
@@ -413,7 +411,8 @@
 ! Step 1b: Call NearestNeighbor if particles i and j interact
 !
          if ((am_flag==2).or.(collisional_flag>=1)
-     >          .or.(qs_fluct_flag>=1)) then
+     >          .or.(qs_fluct_flag>=1)
+     >          .or.(pseudoTurb_flag==1)) then
 
          if ((qs_fluct_flag>=1) .and. (vmag .gt. 1.d-8)) then
             ! Compute mean for particle i
@@ -457,8 +456,8 @@
                w2pmean  = gkern*(ppiclf_y(PPICLF_JVZ,i)**2)*
      >                    ppiclf_rprop(PPICLF_R_JVOLP,i)
                icpmean = 1
-            end if
-         end if
+            end if 
+         end if ! qs_fluct_flag .and. vmag
 
          ! add neighbors
          IF ( sbNearest_flag .EQ. 1) THEN
@@ -489,7 +488,6 @@
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
-
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
@@ -497,8 +495,10 @@
          !   and is called above in Step 1b
          if (qs_fluct_flag==1) then
             call ppiclf_user_QS_fluct_Lattanzi(i,iStage,fqs_fluct)
-         elseif (qs_fluct_flag==2) then
-            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct)
+         elseif (qs_fluct_flag==2 .or. pseudoTurb_flag==1) then
+            call ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,xi_T,
+     >                                      fqsx, fqsy, fqsz)
          endif
 
          ! Add fluctuation part to quasi-steady force
@@ -510,6 +510,11 @@
          ppiclf_rprop(PPICLF_R_FLUCTFX,i) = fqs_fluct(1)
          ppiclf_rprop(PPICLF_R_FLUCTFY,i) = fqs_fluct(2)
          ppiclf_rprop(PPICLF_R_FLUCTFZ,i) = fqs_fluct(3)
+         
+         ! Store normally distributed random variables xi for PseudoTurbulence
+         ppiclf_rprop(PPICLF_R_XIPAR,i)  = xi_par
+         ppiclf_rprop(PPICLF_R_XIPERP,i) = xi_perp
+         ppiclf_rprop(PPICLF_R_XIT,i) = xi_T
 
 !
 ! Step 4: Force component added mass
@@ -644,7 +649,7 @@
 
 !
 ! Step 10: Set ydot for all PPICLF_SLN number of equations
-!
+
          ppiclf_ydot(PPICLF_JX ,i) = ppiclf_y(PPICLF_JVX,i)
          ppiclf_ydot(PPICLF_JY ,i) = ppiclf_y(PPICLF_JVY,i)
          ppiclf_ydot(PPICLF_JZ, i) = ppiclf_y(PPICLF_JVZ,i)
@@ -704,6 +709,17 @@
      >         (ppiclf_ydot(PPICLF_JVZ,i)*rmass - fcz)
 
             ! Energy equation feedback term
+            if(pseudoTurb_flag==1) then
+            ! 09/02/2025 -  Addition of PTKE to Rocflu's Energy Equation
+              ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i)*
+     >         ( (fqsx+fvux+famx+liftx)*ppiclf_y(PPICLF_JVX,i) + 
+     >           (fqsy+fvuy+famy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
+     >           (fqsz+fvuz+famz+liftz)*ppiclf_y(PPICLF_JVZ,i) +
+     >           qq )
+
+            else ! Pseudo Turbulence is OFF
+            ! 09/19/2025 - Thierry - Added Lift force
+            ! Still need to add Torue \cdot angular velocity
             ppiclf_ydotc(PPICLF_JT,i) = ppiclf_rprop(PPICLF_R_JSPL,i) *
      >         ( (fqsx+fvux+liftx)*ppiclf_y(PPICLF_JVX,i) + 
      >           (fqsy+fvuy+lifty)*ppiclf_y(PPICLF_JVY,i) + 
@@ -715,8 +731,29 @@
      >                  tauy_hydro*ppiclf_y(PPICLF_JOY,i) +
      >                  tauz_hydro*ppiclf_y(PPICLF_JOZ,i) +
      >           qq )
+
             !ppiclf_ydotc(PPICLF_JT,i) = -1.0d0*ppiclf_ydotc(PPICLF_JT,i)
-         endif 
+            endif ! pseudoTurb_flag
+
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! We need to store the tensor calculations here in a certain array and then
+      ! access that in the mapping subroutine for when projection is needed
+
+            ppiclf_rprop4(PPICLF_R_JRSG11,i) = Rsg(1,1)
+            ppiclf_rprop4(PPICLF_R_JRSG12,i) = Rsg(1,2)
+            ppiclf_rprop4(PPICLF_R_JRSG13,i) = Rsg(1,3)
+            ppiclf_rprop4(PPICLF_R_JRSG21,i) = Rsg(2,1)
+            ppiclf_rprop4(PPICLF_R_JRSG22,i) = Rsg(2,2)
+            ppiclf_rprop4(PPICLF_R_JRSG23,i) = Rsg(2,3)
+            ppiclf_rprop4(PPICLF_R_JRSG31,i) = Rsg(3,1)
+            ppiclf_rprop4(PPICLF_R_JRSG32,i) = Rsg(3,2)
+            ppiclf_rprop4(PPICLF_R_JRSG33,i) = Rsg(3,3) 
+            
+            ppiclf_rprop4(PPICLF_R_JTSG1,i) = T_par(1)
+            ppiclf_rprop4(PPICLF_R_JTSG2,i) = T_par(2)
+            ppiclf_rprop4(PPICLF_R_JTSG3,i) = T_par(3)
+            
+         endif ! feedback_flag
 
 !
 ! Step 12: If stationary, don't move particles. Feedback can still be on
@@ -754,25 +791,26 @@
 !
 ! Step 13: Store forces
 !
-         ppiclf_rprop(PPICLF_R_FQSX,i)  = fqsx
-         ppiclf_rprop(PPICLF_R_FQSY,i)  = fqsy
-         ppiclf_rprop(PPICLF_R_FQSZ,i)  = fqsz
-         ppiclf_rprop(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
-         ppiclf_rprop(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
-         ppiclf_rprop(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
-         ppiclf_rprop(PPICLF_R_FAMBX,i) = FamBinary(1)
-         ppiclf_rprop(PPICLF_R_FAMBY,i) = FamBinary(2)
-         ppiclf_rprop(PPICLF_R_FAMBZ,i) = FamBinary(3)
-         ppiclf_rprop(PPICLF_R_FCX,i)   = fcx
-         ppiclf_rprop(PPICLF_R_FCY,i)   = fcy
-         ppiclf_rprop(PPICLF_R_FCZ,i)   = fcz
-         ppiclf_rprop(PPICLF_R_FVUX,i)  = fvux
-         ppiclf_rprop(PPICLF_R_FVUY,i)  = fvuy
-         ppiclf_rprop(PPICLF_R_FVUZ,i)  = fvuz
-         ppiclf_rprop(PPICLF_R_QQ,i)    = qq
-         ppiclf_rprop(PPICLF_R_FPGX,i)  = fdpdx
-         ppiclf_rprop(PPICLF_R_FPGY,i)  = fdpdy
-         ppiclf_rprop(PPICLF_R_FPGZ,i)  = fdpdz
+         ! Thierry - just testing this for now to see if it makes a difference in R_perp
+         ppiclf_rprop5(PPICLF_R_FQSX,i)  = fqsx
+         ppiclf_rprop5(PPICLF_R_FQSY,i)  = fqsy
+         ppiclf_rprop5(PPICLF_R_FQSZ,i)  = fqsz
+         ppiclf_rprop5(PPICLF_R_FAMX,i)  = famx-rmass_add*ppiclf_ydot(PPICLF_JVX,i)
+         ppiclf_rprop5(PPICLF_R_FAMY,i)  = famy-rmass_add*ppiclf_ydot(PPICLF_JVY,i)
+         ppiclf_rprop5(PPICLF_R_FAMZ,i)  = famz-rmass_add*ppiclf_ydot(PPICLF_JVZ,i)
+         ppiclf_rprop5(PPICLF_R_FAMBX,i) = FamBinary(1)
+         ppiclf_rprop5(PPICLF_R_FAMBY,i) = FamBinary(2)
+         ppiclf_rprop5(PPICLF_R_FAMBZ,i) = FamBinary(3)
+         ppiclf_rprop5(PPICLF_R_FCX,i)   = fcx
+         ppiclf_rprop5(PPICLF_R_FCY,i)   = fcy
+         ppiclf_rprop5(PPICLF_R_FCZ,i)   = fcz
+         ppiclf_rprop5(PPICLF_R_FVUX,i)  = fvux
+         ppiclf_rprop5(PPICLF_R_FVUY,i)  = fvuy
+         ppiclf_rprop5(PPICLF_R_FVUZ,i)  = fvuz
+         ppiclf_rprop5(PPICLF_R_QQ,i)    = qq
+         ppiclf_rprop5(PPICLF_R_FPGX,i)  = fdpdx
+         ppiclf_rprop5(PPICLF_R_FPGY,i)  = fdpdy
+         ppiclf_rprop5(PPICLF_R_FPGZ,i)  = fdpdz
 
 !
 ! Step 14: If debug mode is ON, calculate and print the max values.
@@ -1156,22 +1194,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i, iStage
       real*8 famx, famy, famz
 !
@@ -1335,7 +1357,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Parmar(i,beta,cd)
+      subroutine ppiclf_user_QS_Parmar(i,beta)
 !
       implicit none
 !
@@ -1343,24 +1365,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr
 
@@ -1458,7 +1464,7 @@
 !   Reynolds numbers and volume fractions. 
 !
 !-----------------------------------------------------------------------
-      subroutine ppiclf_user_QS_ModifiedParmar(i,beta,cd)
+      subroutine ppiclf_user_QS_ModifiedParmar(i,beta)
 !
       implicit none
 !
@@ -1466,24 +1472,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re
+      real*8 gamma
       real*8 rcd1,rmacr,rcd_mcr,rcd_std,rmach_rat,rcd_M1,
      >   rcd_M2,C1,C2,C3,f1M,f2M,f3M,lrep,factor,cd,beta,phi_corr,
      >   b1,b2,b3
@@ -1593,7 +1583,7 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_Osnes(i,beta,cd)
+      subroutine ppiclf_user_QS_Osnes(i,beta)
 !
       implicit none
 !
@@ -1601,24 +1591,8 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
-      real*8 gamma,mp,phi,re,Knp,fKn,CD1,s,JM,CD2,
+      real*8 gamma,Knp,fKn,CD1,s,JM,CD2,
      >   cd_loth,CM,GM,HM,b1,b2,b3,cd,beta
       real*8 sgby2, JMt
 
@@ -1729,31 +1703,14 @@
       include "PPICLF"
 !
 ! Internal:
-!
-! Common block: this will be deleted later from the merge with PT
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
 
 ! Internal variables
       integer*4 i
-      real*8 cd, beta, phifRep, phip, phif, re
+      real*8 cd, beta, phifRep, phif
 !
 ! Code:
 
-      phip = dmax1(rphip,0.0001d0)
+      phi  = dmax1(rphip,0.0001d0)
       phif = dmax1(rphif,0.0001d0)
       re  = dmax1(rep,0.1d0)     
 
@@ -1766,13 +1723,13 @@
       endif
 
       if(phif .lt. 0.8) then
-        beta = 150.0*((phip**2)*rmu)/(phif * dp**2)
-     >          + 1.75*(rhof*phip*vmag/dp)
+        beta = 150.0*((phi**2)*rmu)/(phif * dp**2)
+     >          + 1.75*(rhof*phi*vmag/dp)
       else 
-        beta = 0.75*cd*phip*rhof*vmag/(dp*phif**1.65)
+        beta = 0.75*cd*phi*rhof*vmag/(dp*phif**1.65)
       endif
 
-      beta = beta*(rpi*dp**3)/(6.0*phip)
+      beta = beta*(rpi*dp**3)/(6.0*phi)
 
       return
       end
@@ -1816,21 +1773,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, iStage
       real*8 fqs_fluct(3)
 
@@ -1843,11 +1785,14 @@
 !
       TwoPi = 2.0d0*acos(-1.0d0)
 
+
       if (qs_fluct_filter_flag==0) then
          denum = max(dfloat(icpmean),1.d0)  ! for arithmetic mean
       else if (qs_fluct_filter_flag==1) then
          denum = max(phipmean,1.0e-6)  ! for volume mean
       endif
+      
+
       upmean = upmean / denum
       vpmean = vpmean / denum
       wpmean = wpmean / denum
@@ -1986,37 +1931,28 @@
 !
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct)
-!
+      subroutine ppiclf_user_QS_fluct_Osnes(i,iStage,fqs_fluct,
+     >                                      xi_par,xi_perp,xi_T,
+     >                                      fqsx,fqsy,fqsz)
+!                                                    
       implicit none
 !
       include "PPICLF"
 !
+! Input:
+      integer*4 i, iStage
+      real*8 fqsx, fqsy, fqsz
+!
+! Output:
+      real*8 xi_par, xi_perp, xi_T
+      real*8 fqs_fluct(3)
+!
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
-      integer*4 i, iStage
-      real*8 fqs_fluct(3)
-
-      real*8 aSDE,bq,chi,denum,dW1,dW2,fq,Fs,gkern,
-     >   sigD,tF_inv,theta,upflct,vpflct,wpflct,Z1,Z2
+      real*8 aSDE,bq,chi,denum,dW1,dW2,dW3,fq,Fs,gkern,
+     >   sigD,tF_inv,theta,upflct,vpflct,wpflct,Z1,Z2,Z3
       real*8 TwoPi
-      real*8 bSDE_CD, bSDE_CL,CD_frac,CD_prime
+      real*8 bSDE_CD, bSDE_CL, bSDE_CT, CD_frac, CD_prime
       real*8 sigT,sigCT
       real*8 sigmoid_cf, f_CF
       real*8 avec(3)
@@ -2026,6 +1962,21 @@
       real*8 cosrand,sinrand
       real*8 eunit(3)
 
+      integer*4 m
+      real*8 s_par, s_perp, s_T, Rmean_par, Rmean_perp, R_par, R_perp
+      real*8 R(3,3), Q(3,3), Qt(3,3), Tmean_par(3)
+      real*8 CD_average
+      real*8 k_tilde, k_Mach, b_tilde, b_Mach, b_par, b_perp,
+     >       k_Osnes, b_Osnes
+      real*8 C1, C2, C3, C4, C5,
+     >       D1, D2, D3, D4, D5, D6, D7, D8,
+     >       E1, E2, E3, E4
+      real*8 F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11,
+     >       G1, G2, G3, G4, G5, G6, G7, G8,
+     >       H1, H2, H3, H4, H5, H6, H7, H8,
+     >       A1, A2, A3, A4
+      real*8 D9, D10, D11
+      real*8 fit_func
 !
 ! Code:
 !
@@ -2036,6 +1987,7 @@
       else if (qs_fluct_filter_flag==1) then
          denum = max(phipmean,1.0e-6)  ! for volume mean
       endif
+      
       upmean = upmean / denum
       vpmean = vpmean / denum
       wpmean = wpmean / denum
@@ -2139,6 +2091,8 @@
 ! The third (cvec) is cross product of the first two
 ! written 3/6/24
 !
+! avec : unit vector in main direction
+! bvec, cvec: two orthogonal vectors to avec
       eunit = [1,0,0]
       if (abs(avec(2))+abs(avec(3)) <= 1.d-8) then
          eunit = [0,1,0]
@@ -2158,17 +2112,22 @@
       denum   = max(1.d-8,sqrt(cvec(1)**2 + cvec(2)**2 + cvec(3)**2))
       cvec    = cvec / denum
 
+      ! Generate  Gaussian Random Values
       call RANDOM_NUMBER(UnifRnd)
 
+! Box-Muller transform for generating two independent standard normal
+! (Gaussian) random variables
+! Z1 & Z2 are standard normal random variables
       Z1 = sqrt(-2.0d0*log(UnifRnd(1)))*cos(TwoPi*UnifRnd(2))
       Z2 = sqrt(-2.0d0*log(UnifRnd(3)))*cos(TwoPi*UnifRnd(4))
 
+! dW1 & dW2 are scaled stochastic amplitudes       
       dW1 = sqrt(fac)*Z1
       dW2 = sqrt(fac)*Z2
 
 ! Random mixture of bvec and cvec - make sure the new one is a unit vector
 ! Added 3/6/24
-!
+! dvec : Random unit direction in perpendicular plane 
       cosrand = cos(TwoPi*UnifRnd(5))
       sinrand = sin(TwoPi*UnifRnd(5)) 
       dvec(1) = bvec(1)*cosrand + cvec(1)*sinrand
@@ -2177,6 +2136,11 @@
       denum   = max(1.d-8,sqrt(dvec(1)**2 + dvec(2)**2 + dvec(3)**2))
       dvec    = dvec/denum
 
+      ! Store and project back fqs_fluct values only if QSFLUCT = 2
+      ! Otherwise, need to call subroutine for PseudoTurbulence
+      if(qs_fluct_flag .eq. 0) then
+        fqs_fluct = 0.0d0
+      else
       fqs_fluct(1) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFX,i)
      >           + bSDE_CD*dW1*avec(1) + bSDE_CL*dW2*dvec(1)
@@ -2186,7 +2150,7 @@
       fqs_fluct(3) = 
      >           (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_FLUCTFZ,i)
      >           + bSDE_CD*dW1*avec(3) + bSDE_CL*dW2*dvec(3)
-
+      endif
 
       if (ppiclf_debug==2 .and. (iStage==1 .and. ppiclf_nid==0)) then
          if (ppiclf_time.gt.2.d-8) then
@@ -2215,6 +2179,224 @@
          endif
       endif
 
+!---------------------------------------------------------------------------
+! Pseudo-Turbulence Calculations starts here 
+      if(pseudoTurb_flag==1) then
+        !phi = max(0.05d0, min(0.3d0, rphip))
+        !mp = max(0.0d0, min(0.87d0, rmachp))
+        !re = max(0.0d0, min(266.0d0, rep))
+        phi = rphip
+        mp = rmachp
+        re = rep
+        rem = (1.0-phi)*re
+
+      ! Constants taken from Osnes PseudoTurbulent paper, Table 1
+        C1 = -1.2152; D1 = -0.0462; E1 = -0.2906;
+        C2 = -7.6314; D2 = -0.1068; E2 =  1.1899; 
+        C3 =  0.2889; D3 =  0.6793; E3 =  0.5218; 
+        C4 =  0.6143; D4 =  1.1461; E4 =  0.0699;
+        C5 =  0.3082; D5 = -2.6886; 
+                      D6 = -2.1376;
+                      D7 =  0.4873;
+                      D8 =  0.2395;
+                    ! Dr. Bala's terms
+                      D9  =  0.716
+                      D10 = -2.14
+                      D11 =  1.6
+
+      ! Constants taken from Osnes PseudoTurbulent paper, Table 2
+        F1  = -0.0022; G1 = -0.2867; H1 =  0.4992
+        F2  = -0.0219; G2 =  0.2176; H2 = -1.3528
+        F3  =  0.0932; G3 =  0.2826; H3 = -0.1358
+        F4  = -0.0135; G4 = -0.0644; H4 = -0.1463
+        F5  =  0.0361; G5 =  0.0466; H5 =  0.2583
+        F6  =  0.0403; G6 =  0.0973; H6 = -0.3339
+        F7  = -0.0761; G7 = -0.0081; H7 = -0.0407
+        F8  =  0.0599; G8 = -0.0235; H8 = -0.0806
+        F9  =  0.0164;
+        F10 =  0.0453;
+        F11 = -0.0265;
+     
+        ! zero out variables  at first
+        Rmean_par = 0.0d0 ; Rmean_perp = 0.0d0
+        R = 0.0d0; Rsg = 0.0d0
+        Tmean_par = 0.0d0; T_par = 0.0d0
+        
+        ! CD_average is zero at early time steps
+
+        avec = [vx,vy,vz]/vmag
+
+        CD_average = fqsx*avec(1) +
+     >               fqsy*avec(2) +
+     >               fqsz*avec(3)
+
+        ! avoiding singularity
+        if(CD_average .lt. 1.d-8) return
+
+        ! Reynolds Subgrid Stress Tensor - Eulerian Mean Model 
+                                                                       
+        ! Reynolds number and vol fraction dependent k^tilde and b_par 
+        ! Mehrabadi's terms
+        k_tilde = 2.0*phi + 2.5*phi*((1.0-phi)**3) * 
+     >         exp(-phi*(rem**0.5))                                 
+                                                                    
+!        b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+!     >          exp(-3.511*phi/(1.0+1.801*exp(-0.005*rem)))
+
+        ! 08/25/2025 - Thierry - Fitted phip function to better match
+        ! formulation with Osnes's low Mach number data
+        fit_func = -10.18530152*phi**3 + 10.94163073*phi**2
+     >              -7.07374862*phi +  0.38424203
+        b_par = 0.523/(1.0+0.305*exp(-0.114*rem)) *
+     >          exp(fit_func/(1.0+1.801*exp(-0.005*rem)))
+                                                                       
+        ! Mach number correction provided by Osnes                            
+!        k_Mach = phi*(C1 + C2*phi + re**C3) * 
+!     >        (tanh(C4/C5) + tanh((mp - C4)/C5))
+
+        ! Mach number correction at Re=100, coeff taken from Osnes
+        ! cap vol fraction here at 0.3
+        k_Mach = min(phi,0.3)*(-6.918*min(phi,0.3) + 2.238) *
+     >        (tanh(C4/C5) + tanh((mp - C4)/C5))
+
+!        b_Mach = (D1 + (re/300.0)*(D2 + D3*re/300.0) +
+!     >         phi*(D4 + D5*(re**2/300.0**2) + D6*phi)) *
+!     >         (tanh(-D7/D8) - tanh((mp-D7)/D8))
+
+        ! First term was corrected by Dr. Bala (D9, D10, D11)
+        b_Mach = phi*(D9 + D10*phi + D11*phi**2) *
+     >         (tanh(-D7/D8) - tanh((mp-D7)/D8))
+
+        ! Corrected k^tilde and b_par components                       
+        k_Osnes =  k_tilde*(1.0d0 + k_Mach)
+        b_Osnes =  b_par  *(1.0d0 + b_Mach)
+        b_perp  = -b_Osnes/2.0d0
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Parallel Component   
+        Rmean_par  = 2.0d0*k_Osnes*(b_Osnes  + 1.0d0/3.0d0)
+                                                                       
+        ! Mean Eulerian Reynolds Subgrid Stress - Perpendicular Component
+        Rmean_perp = 2.0d0*k_Osnes*(b_perp + 1.0d0/3.0d0)
+
+        ! Mean Pseudo Turbulent Kinetic Energy Model
+        Tmean_par = E1 + E2*phi/(E3 + re/300.0) + E4*mp
+        
+c--  Multiply by the mean relative flow kinetic energy to dimentionalize      
+        Rmean_par  = Rmean_par  * 0.5d0 * vmag**2
+        Rmean_perp = Rmean_perp * 0.5d0 * vmag**2
+
+c--  Multiply by the mean relative velocity & flow kinetic energy to dimentionalize      
+        Tmean_par(1)  = Tmean_par(1) * vx * k_Osnes * 0.5d0 * vmag**2
+        Tmean_par(2)  = Tmean_par(2) * vy * k_Osnes * 0.5d0 * vmag**2
+        Tmean_par(3)  = Tmean_par(3) * vz * k_Osnes * 0.5d0 * vmag**2
+
+c------ Lagrangian Model
+  
+        ! 08/15/2025 - Ditch A1 per Dr. Bala, and set A2 to this constant per Osnes
+        A1 = 0.0d0
+        A2 = 0.064
+
+        A3 = G1 + G2/(min(phi,0.3) + G3) + G4 * mp
+        
+        ! 09/02/2025 - Cap according to Osnes model range
+        A4 = H1 + H2*max(0.0d0, min(0.3d0, phi))
+     >          + H3*max(0.0d0, min(0.87d0, mp)) 
+     >          + H4*max(30.0d0, min(266.0d0, re))/300.0d0
+  
+        s_par = F8 + F9/(phi + F10) + F11 * mp
+        !s_perp = G5/(phi + G6) + (G7*re)/(300.0*phi) + G8
+c---     We ditch Osnes's expression for s_perp and assume it as big as s_par
+        s_perp = s_par
+        
+        ! 09/02/2025 - Cap according to Osnes model range
+        s_T = H5 + H6*max(0.0d0, min(0.3d0, phi))
+     >           + H7*max(0.0d0, min(0.87d0, mp)) 
+     >           + H8*max(30.0d0, min(266.0d0, re))/300.0d0
+
+        tF_inv = (24.0*phi*chi/dp) * sqrt(theta/rpi)
+        aSDE = tF_inv
+        bSDE_CD = s_par *sqrt(2.0*tF_inv)
+        bSDE_CL = s_perp*sqrt(2.0*tF_inv)
+        bSDE_CT = s_T *sqrt(2.0*tF_inv)
+  
+        call RANDOM_NUMBER(UnifRnd)
+        
+        ! Box-Muller transform for generating two independent standard normal
+        ! (Gaussian) random variables
+        ! Z1 & Z2 are standard normal random variables
+        Z1 = sqrt(-2.0d0*log(UnifRnd(1))) * cos(TwoPi*UnifRnd(2))
+        Z2 = sqrt(-2.0d0*log(UnifRnd(3))) * sin(TwoPi*UnifRnd(4))
+        Z3 = sqrt(-2.0d0*log(UnifRnd(5))) * cos(TwoPi*UnifRnd(6))
+
+        ! dW1 & dW2 are scaled stochastic amplitudes       
+        dW1 = sqrt(fac)*Z1
+        dW2 = sqrt(fac)*Z2
+        dW3 = sqrt(fac)*Z3
+  
+        ! Langevin Model implemented for xi_par, xi_perp, xi_T
+        xi_par = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPAR,i)
+     >            + bSDE_CD*dW1
+        xi_perp = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIPERP,i)
+     >            + bSDE_CL*dW2
+        xi_T = (1.0-aSDE*fac)*ppiclf_rprop(PPICLF_R_XIT,i)
+     >            + bSDE_CT*dW3
+
+        ! CD_prime has unit of Force
+        ! CD_average has unit of Force
+
+        ! Lagrangian Reynolds Subgrid Stress - Parallel Component
+        R_par = 1.0 + A1 + A2 * CD_prime / CD_average + xi_par
+  
+        ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
+        R_perp = 1.0 + A3 * CD_prime / CD_average + xi_perp
+
+c--  Multiply Lagrangian Model by the Eulerian Mean Model
+        R_par  = R_par  * Rmean_par 
+        R_perp = R_perp * Rmean_perp
+
+c---  Q = [avec | bvec | cvec], 3x3 matrix
+c---  avec : unit vector in main direction
+c---  bvec, cvec: two orthogonal vectors to avec
+
+        ! 08/15/2025 - Thierry - still need to finalize how to do the
+        ! rotation of the R tensor 
+        do m=1,3
+          Q(m,1) = avec(m)
+          Q(m,2) = bvec(m)
+          Q(m,3) = cvec(m)
+        enddo
+  
+        Qt = transpose(Q)
+  
+c--- R = |R_par,   0   ,   0   |
+c---     | 0   , R_perp,   0   |
+c---     | 0       0   , R_perp|
+  
+c---  R matrix only has diagonal components
+        R(1,1) = R_par
+        R(2,2) = R_perp
+        R(3,3) = R_perp
+  
+c--- Now Rotate the matrix, Rsg = Q . R . Q^T
+  
+       Rsg = matmul(Q, matmul(R,Qt))
+
+c--- Osnes Formulation for PTKE
+
+      T_par = A4 * CD_prime/CD_average + xi_T
+
+c--  Multiply by the mean relative velocity & flow kinetic energy to dimentionalize      
+c--  then add mean PTKE
+       T_par(1) = T_par(1) * vx * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(1)
+
+       T_par(2) = T_par(2) * vy * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(2)
+
+       T_par(3) = T_par(3) * vz * k_Osnes * 0.5d0 * vmag**2 
+     >            + Tmean_par(3)
+
+      endif ! pseudoTurb_flag
 
       return
       end
@@ -2242,21 +2424,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, iStage
       real*8 famx, famy, famz, rmass_add
       real*8 rcd_am
@@ -2403,21 +2570,6 @@
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer i, j, k, l, n, jj
       integer*4 iStage
       real*8 rad
@@ -2544,21 +2696,6 @@
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer i, j, k, l, n, jj
       integer*4 iStage
       real*8 rad
@@ -3330,22 +3467,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
       real*8 qq, Nuss, Q_conv
 
@@ -3575,22 +3696,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i,iStage
       real*8 taux, tauy, tauz
       real*8 taux_hydro, tauy_hydro, tauz_hydro
@@ -3765,22 +3870,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i,iStage
       real*8 liftx, lifty, liftz
 
@@ -3813,6 +3902,9 @@
 ! Valid for Rep < 50 and omg* < 0.8 (see Loft, "Lift of a spherical
 !    particle subject to vorticity and/or spin", AIAA J., 
 !    Vol. 46,  pp. 801-809, 2008)
+!      
+! References:
+! 1) Fundamentals of Dispersed Multiphase Flows (S.Balachandar), Chap.5
 !
 !-----------------------------------------------------------------------
 !
@@ -3879,7 +3971,12 @@
 ! Subroutine for Magnus lift - lift induced by particle rotation
 !
 ! Requires particle angular velocity to be calculated
-!
+!      
+! References:
+! 1) Fundamentals of Dispersed Multiphase Flows (S.Balachandar), Chap.5
+! 2) Loth and Drogan, "An equation of motion for particles of finite
+! Reynolds number and size", (2009). 
+!      
 !-----------------------------------------------------------------------
 !
       subroutine Lift_Magnus(i,liftx,lifty,liftz)
@@ -3954,21 +4051,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, iStage, iT
       real*8 fvux,fvuy,fvuz
       real*8 time,fH,factor,A,B,kernelVU
@@ -4052,21 +4134,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, iT
 
 !
@@ -4197,21 +4264,6 @@
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i,k,ic,iT
 !
 ! Code:
@@ -4257,21 +4309,6 @@
 !
       include "PPICLF"
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i,k,ic,iT
 !
 ! Code:
@@ -4325,22 +4362,6 @@
 !
 ! Input:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData, ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-
       integer*4 i
       integer*4 j
       real*8 yi    (PPICLF_LRS)    
@@ -4387,6 +4408,8 @@
       real*8 E1, E2, Estar
       real*8 r1, r2, Rstar 
       real*8 ksp1, ksp2, ksp_min
+      ! Thierry - for PseudoTurbulence
+      real*8 vmagj, asndfj, rhofj, dpj, phij, rej, mpj
 
 !
 ! Code:
@@ -4661,7 +4684,6 @@
          ! The mean is calcuated according to Lattanzi etal,
          !   Physical Review Fluids, 2022.
          !
-         if (j.ne.0) then
          if (qs_fluct_filter_flag==0) then
             upmean   = upmean + yj(PPICLF_JVX)
             vpmean   = vpmean + yj(PPICLF_JVY)
@@ -4692,9 +4714,6 @@
      >                gkern*(yj(PPICLF_JVZ)**2)*rpropj(PPICLF_R_JVOLP)
             icpmean = icpmean + 1
          end if
-         end if
-
-
 !-----------------------------------------------------------------------
 !
       ! boundaries
@@ -4784,7 +4803,7 @@
 
 !-----------------------------------------------------------------------
 !
-      subroutine ppiclf_user_MapProjPart(map,y,ydot,ydotc,rprop)
+      subroutine ppiclf_user_MapProjPart(map,y,ydot,ydotc,rprop,rprop4)
 !
       implicit none
       include "PPICLF"
@@ -4795,6 +4814,7 @@
       real*8 ydot (PPICLF_LRS)
       real*8 ydotc(PPICLF_LRS)
       real*8 rprop(PPICLF_LRP)
+      real*8 rprop4(PPICLF_LRP4)
 !
 ! Output:
 !
@@ -4817,6 +4837,23 @@
       map(PPICLF_P_JPHIPW) = rprop(PPICLF_R_JVOLP)*y(PPICLF_JVZ)
       map(PPICLF_P_JPHIPT) = rprop(PPICLF_R_JVOLP)*y(PPICLF_JT)
 
+      ! 07/21/2025 - Thierry - Added Reynolds Subgrid Stress Tensor
+      ! Still thinking whether I should expand the map array to include the projected Reynolds
+      ! Stress Tensor values or just take them from rprop2 
+
+      map(PPICLF_P_JRSG11) = rprop4(PPICLF_R_JRSG11)
+      map(PPICLF_P_JRSG12) = rprop4(PPICLF_R_JRSG12)
+      map(PPICLF_P_JRSG13) = rprop4(PPICLF_R_JRSG13)
+      map(PPICLF_P_JRSG21) = rprop4(PPICLF_R_JRSG21)
+      map(PPICLF_P_JRSG22) = rprop4(PPICLF_R_JRSG22)
+      map(PPICLF_P_JRSG23) = rprop4(PPICLF_R_JRSG23)
+      map(PPICLF_P_JRSG31) = rprop4(PPICLF_R_JRSG31)
+      map(PPICLF_P_JRSG32) = rprop4(PPICLF_R_JRSG32)
+      map(PPICLF_P_JRSG33) = rprop4(PPICLF_R_JRSG33)
+
+      map(PPICLF_P_JTSG1)  = rprop4(PPICLF_R_JTSG1)
+      map(PPICLF_P_JTSG2)  = rprop4(PPICLF_R_JTSG2)
+      map(PPICLF_P_JTSG3)  = rprop4(PPICLF_R_JTSG3)
 
       return
       end
@@ -4836,21 +4873,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i,j,k
 
 !
@@ -4883,21 +4905,6 @@
 !
 ! Internal:
 !
-      integer*4 :: stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
-      real*8 :: rmu_ref, tref, suth, ksp, erest
-      common /RFLU_ppiclF/ stationary, qs_flag, am_flag, pg_flag,
-     >   collisional_flag, heattransfer_flag, feedback_flag,
-     >   qs_fluct_flag, ppiclf_debug, rmu_flag, rmu_ref, tref, suth,
-     >   rmu_fixed_param, rmu_suth_param, qs_fluct_filter_flag,
-     >   qs_fluct_filter_adapt_flag, ksp, erest,
-     >   ViscousUnsteady_flag, ppiclf_nUnsteadyData,ppiclf_nTimeBH,
-     >   sbNearest_flag, burnrate_flag, flow_model
       integer*4 i, n, ic, k, iStage
 
 ! Needed for allreduce
@@ -6440,7 +6447,7 @@ c-----------------------------------------------------------------------
       logical partl    
       integer*4 lrf
       parameter(lrf = PPICLF_LRS*4 + PPICLF_LRP + PPICLF_LRP2
-     >       + PPICLF_LRP3)
+     >       + PPICLF_LRP3 + PPICLF_LRP4 + PPICLF_LRP5)
       real*8 rwork(lrf,PPICLF_LPART)
       integer*4 i, ic, j0
 !
@@ -6461,6 +6468,10 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop2(1,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(rwork(ic,i),ppiclf_rprop3(1,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(rwork(ic,i),ppiclf_rprop4(1,i),PPICLF_LRP4)
+         ic = ic + PPICLF_LRP4
+         call ppiclf_copy(rwork(ic,i),ppiclf_rprop5(1,i),PPICLF_LRP5)
       enddo
 
       j0 = 4
@@ -6490,6 +6501,10 @@ c-----------------------------------------------------------------------
          call ppiclf_copy(ppiclf_rprop2(1,i),rwork(ic,i),PPICLF_LRP2)
          ic = ic + PPICLF_LRP2
          call ppiclf_copy(ppiclf_rprop3(1,i),rwork(ic,i),PPICLF_LRP3)
+         ic = ic + PPICLF_LRP3
+         call ppiclf_copy(ppiclf_rprop4(1,i),rwork(ic,i),PPICLF_LRP4)
+         ic = ic + PPICLF_LRP4
+         call ppiclf_copy(ppiclf_rprop5(1,i),rwork(ic,i),PPICLF_LRP5)
       enddo
         
       return
@@ -6574,7 +6589,8 @@ c CREATING GHOST PARTICLES
       do ip=1,ppiclf_npart
 
          call ppiclf_user_MapProjPart(map,ppiclf_y(1,ip)
-     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip))
+     >         ,ppiclf_ydot(1,ip),ppiclf_ydotc(1,ip),ppiclf_rprop(1,ip),
+     >                                              ppiclf_rprop4(1,ip))
 
 c        idum = 1
 c        ppiclf_cp_map(idum,ip) = ppiclf_y(idum,ip)
@@ -10635,6 +10651,12 @@ c1511 continue
       do j=1,PPICLF_LRP3
          ppiclf_rprop3(j,i) = 0.0d0
       ENDdo
+      do j=1,PPICLF_LRP4
+         ppiclf_rprop4(j,i) = 0.0d0
+      ENDdo
+      do j=1,PPICLF_LRP5
+         ppiclf_rprop5(j,i) = 0.0d0
+      ENDdo
       do j=1,PPICLF_LIP
          ppiclf_iprop(j,i) = 0
       enddo
@@ -12946,7 +12968,9 @@ c     ndum    = ppiclf_nee*n
             ppiclf_iprop(1,i) = flag(1,k)
             do j=1,PPICLF_LRP_INT
                jp = PPICLF_INT_MAP(j)
-               ppiclf_rprop(jp,i) = coord(7+j,k)
+               if(jp .gt. 0) then
+                 ppiclf_rprop(jp,i) = coord(7+j,k)
+               endif
             ENDdo
          ENDif
       ENDdo
@@ -13142,6 +13166,10 @@ c----------------------------------------------------------------------
      >              (ppiclf_rprop2(1,ic),ppiclf_rprop2(1,i),PPICLF_LRP2)
                call ppiclf_copy
      >              (ppiclf_rprop3(1,ic),ppiclf_rprop3(1,i),PPICLF_LRP3)
+               call ppiclf_copy
+     >              (ppiclf_rprop4(1,ic),ppiclf_rprop4(1,i),PPICLF_LRP4)
+               call ppiclf_copy
+     >              (ppiclf_rprop5(1,ic),ppiclf_rprop5(1,i),PPICLF_LRP5)
                call ppiclf_icopy
      >              (ppiclf_iprop(1,ic) ,ppiclf_iprop(1,i) ,PPICLF_LIP)
             ENDif
@@ -13327,7 +13355,7 @@ c----------------------------------------------------------------------
             ic = ic + 1
             rproj(ic,ip) = ppiclf_cp_map(j,ip)*multfci
          ENDdo
-                    
+
          iproj(1,ip)  = ppiclf_iprop(8,ip)
          iproj(2,ip)  = ppiclf_iprop(9,ip)
          if (if3d)
