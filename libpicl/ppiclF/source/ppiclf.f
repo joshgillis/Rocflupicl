@@ -475,9 +475,11 @@
          if (qs_flag==1) call ppiclf_user_QS_Parmar(i,beta)
          if (qs_flag==2) call ppiclf_user_QS_Osnes (i,beta)
          if (qs_flag==3) call ppiclf_user_QS_ModifiedParmar(i,beta)
+
          fqsx = beta*vx
          fqsy = beta*vy
          fqsz = beta*vz
+
 !
 ! Step 3: Force fluctuation for quasi-steady force
 !
@@ -2287,18 +2289,6 @@ c---     We ditch Osnes's expression for s_perp and assume it as big as s_par
         ! Lagrangian Reynolds Subgrid Stress - Perpendicular Component
         R_perp = 1.0 + A3 * CD_prime / CD_average + xi_perp
 
-        if(IsNan(R_par) .or. IsNan(R_perp)) then
-          print*, "rep, rmachp, rphip =", rep, rmachp, rphip
-          print*, "vmag, rhof, asndf =", vmag, rhof, asndf
-          print*, "re, mp, phi =", re, mp, phi
-          print*, "A1, A2, A3 =", A1, A2, A3
-          print*, "CD_prime, CD_average =", CD_prime, CD_average
-          print*, "xi_par, xi_perp =", xi_par, xi_perp
-          print*, "Rmean_par, Rmean_perp =", Rmean_par, Rmean_perp
-          print*, "R_par =", R_par, "R_perp =", R_perp
-          STOP
-        endif
-        
 c--  Multiply Lagrangian Model by the Eulerian Mean Model
         R_par  = R_par  * Rmean_par 
         R_perp = R_perp * Rmean_perp
@@ -2316,7 +2306,6 @@ c---  bvec, cvec: two orthogonal vectors to avec
         enddo
   
         Qt = transpose(Q)
-  
   
 c--- R = |R_par,   0   ,   0   |
 c---     | 0   , R_perp,   0   |
@@ -2345,27 +2334,6 @@ c--  then add mean PTKE
 
        T_par(3) = T_par(3) * vz * k_Osnes * 0.5d0 * vmag**2 
      >            + Tmean_par(3)
-
-       if(IsNan(T_par(1)) .or. IsNan(T_par(2)).or.IsNan(T_par(3))) then
-         print*, "T_par(1:3, i) =", T_par
-         print*, "Tmean_par(1:3,i) =", Tmean_par
-         print*, "k_Osnes =", k_Osnes
-         print*, "vmag, vx, vy, vz =", vmag, vx, vy, vz
-         print*, "A4, xi_T =", A4, xi_T
-         print*, "CD_prime, CD_average =", CD_prime, CD_average
-         STOP
-       endif
-
-       if((T_par(1).gt. 1.d30) .or. (T_par(2).gt.1.d30)
-     >     .or. (T_par(3).gt.1.d30)) then
-         print*, "T_par(1:3, i) =", T_par
-         print*, "Tmean_par(1:3,i) =", Tmean_par
-         print*, "k_Osnes =", k_Osnes
-         print*, "vmag, vx, vy, vz =", vmag, vx, vy, vz
-         print*, "A4, xi_T =", A4, xi_T
-         print*, "CD_prime, CD_average =", CD_prime, CD_average
-         STOP
-       endif
 
       endif ! pseudoTurb_flag
 

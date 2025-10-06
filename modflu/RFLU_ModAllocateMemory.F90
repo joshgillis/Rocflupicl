@@ -517,20 +517,11 @@ SUBROUTINE RFLU_AllocateMemorySolCv(pRegion)
      ALLOCATE(pRegion%mixt%piclVFg(1,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclgradRhog(3,1,pGrid%nCellsTot),STAT=errorFlag)
      ! Particle PseudoTurbulence - Reynolds Stress Tensor 
-     ALLOCATE(pRegion%mixt%piclPhiRSG(9,pGrid%nCellsTot),STAT=errorFlag)
-     ALLOCATE(pRegion%mixt%piclGradPhiRSG(3,9,pGrid%nCellsTot),STAT=errorFlag)
-     ALLOCATE(pRegion%mixt%piclDivPhiRSG(3,pGrid%nCells),STAT=errorFlag)
-     ALLOCATE(pRegion%mixt%piclJF(3,pGrid%nCells),STAT=errorFlag)
-     
+     ALLOCATE(pRegion%mixt%piclPhiRsg(9,pGrid%nCellsTot),STAT=errorFlag)
+     ALLOCATE(pRegion%mixt%piclGradPhiRsg(3,9,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclKsg(pGrid%nCellsTot),STAT=errorFlag)
-     
-     ALLOCATE(pRegion%mixt%piclQsg(3,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclPhiQsg(3,pGrid%nCellsTot),STAT=errorFlag)
      ALLOCATE(pRegion%mixt%piclGradPhiQsg(3,3,pGrid%nCellsTot),STAT=errorFlag)
-     ALLOCATE(pRegion%mixt%piclDivPhiQsg(pGrid%nCellsTot),STAT=errorFlag)
-
-     ALLOCATE(pRegion%mixt%piclRhsEnergy(pGrid%nCells),STAT=errorFlag)
-     ALLOCATE(pRegion%mixt%piclRhsMom(3,pGrid%nCells),STAT=errorFlag)
      global%error = errorFlag
      IF (global%error /= ERR_NONE) THEN
         CALL ErrorStop(global,ERR_ALLOCATE,__LINE__,'pRegion%mixt%piclfVF')

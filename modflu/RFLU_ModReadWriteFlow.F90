@@ -2714,12 +2714,6 @@ MODULE RFLU_ModReadWriteFlow
       WRITE(iFile) (pRegion%mixt%piclVF(j),j=1,pGrid%nCellsTot)
       ! 03/20/2025 - Thierry - begins here
       WRITE(iFile) (pRegion%mixt%piclgradRhog(:,1,j),j=1,pGrid%nCellsTot)
-      WRITE(iFile) (pRegion%mixt%piclDivPhiRSG(:,j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclDivPhiQsg(j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclRhsEnergy(j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclRhsMom(:,j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclJF(:,j),j=1,pGrid%nCells)
-      WRITE(iFile) (pRegion%mixt%piclKsg(j),j=1,pGrid%nCellsTot)
       ! 03/20/2025 - Thierry - ends here
 
   END IF
@@ -3072,24 +3066,6 @@ MODULE RFLU_ModReadWriteFlow
          varY=pRegion%mixt%piclgradRhog(2,1,1:Ne), &
          varZ=pRegion%mixt%piclgradRhog(3,1,1:Ne))
       ! 03/20/2025 - Thierry - ends here
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Div Phi RSG', &
-         varX=pRegion%mixt%piclDivPhiRSG(1,1:Ne), &
-         varY=pRegion%mixt%piclDivPhiRSG(2,1:Ne), &
-         varZ=pRegion%mixt%piclDivPhiRSG(3,1:Ne))
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Div Phi QSG', &
-         var=pRegion%mixt%piclDivPhiQsg(1:Ne))
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Rhs Energy', &
-         var=pRegion%mixt%piclRhsEnergy(1:Ne))
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Rhs Mom', &
-         varX=pRegion%mixt%piclRhsMom(1,1:Ne), &
-         varY=pRegion%mixt%piclRhsMom(2,1:Ne), &
-         varZ=pRegion%mixt%piclRhsMom(3,1:Ne))
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Feedback Force', &
-         varX=pRegion%mixt%piclJF(1,1:Ne), &
-         varY=pRegion%mixt%piclJF(2,1:Ne), &
-         varZ=pRegion%mixt%piclJF(3,1:Ne))
-    E_IO = VTK_VAR_XML(NC_NN = Ne, varname = 'Ksg', &
-         var=pRegion%mixt%piclKsg(1:Ne))
   END IF
 #endif
 
@@ -3264,12 +3240,6 @@ MODULE RFLU_ModReadWriteFlow
       E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Gradient Gas Density',& 
                                                                tp='Float64' )
       ! 03/20/2025 - Thierry - ends here
-      E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Div Phi RSG', tp='Float64' )
-      E_IO = PVTK_VAR_XML(varname = 'Div Phi QSG', tp='Float64' )
-      E_IO = PVTK_VAR_XML(varname = 'Rhs Energy', tp='Float64' )
-      E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Rhs Mom', tp='Float64' )
-      E_IO = PVTK_VAR_XML(Nc = 3, varname = 'Feedback Force', tp='Float64' )
-      E_IO = PVTK_VAR_XML(varname = 'Ksg', tp='Float64')
   END IF
 #endif
 
