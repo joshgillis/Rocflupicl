@@ -407,8 +407,6 @@ IF ( global%piclUsed .EQV. .true. ) THEN
         CALL RFLU_MPI_ClearRequestWrapper(pRegion)
       END DO ! iReg
 
-! Testing a run without these MPI calls to make sure they solved the problem
-! of NaN speed of sound
 !! ------ Update PTKE Ksg array for ghost cells ---------
       if(global%piclPseudoTurbFlag .eq. 1) then
         DO iReg = 1,global%nRegionsLocal

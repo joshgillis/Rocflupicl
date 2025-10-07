@@ -255,9 +255,9 @@ MODULE ModInterfacesMixt
     REAL(RFREAL) :: MixtPerf_Po_GPTTo
   END FUNCTION MixtPerf_Po_GPTTo
 
-  FUNCTION MixtPerf_Po_CGPUVW( C,G,P,U,V,W )
+  FUNCTION MixtPerf_Po_CGPUVW( C,G,P,U,V,W,KSG )
     USE ModDataTypes
-    REAL(RFREAL), INTENT(IN) :: C, G, P, U, V, W
+    REAL(RFREAL), INTENT(IN) :: C, G, P, U, V, W, KSG
     REAL(RFREAL) :: MixtPerf_Po_CGPUVW
   END FUNCTION MixtPerf_Po_CGPUVW
 
@@ -303,9 +303,9 @@ MODULE ModInterfacesMixt
     REAL(RFREAL) :: MixtPerf_T_GMaTo
   END FUNCTION MixtPerf_T_GMaTo
   
-  FUNCTION MixtPerf_To_CpTUVW(Cp,T,U,V,W)
+  FUNCTION MixtPerf_To_CpTUVW(Cp,T,U,V,W,KSG)
     USE ModDataTypes
-    REAL(RFREAL), INTENT(IN) :: Cp,T,U,V,W
+    REAL(RFREAL), INTENT(IN) :: Cp,T,U,V,W,KSG
     REAL(RFREAL) :: MixtPerf_To_CpTUVW
   END FUNCTION MixtPerf_To_CpTUVW  
   

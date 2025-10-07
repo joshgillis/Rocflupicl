@@ -504,7 +504,7 @@ SUBROUTINE RFLU_BXV_CompMomEnergyPatch(pRegion,pPatch)
     p = pRegion%mixt%dv(DV_MIXT_PRES,icg) !For Jacob's Case...2/13/20
 
     CALL RFLU_JWL_ComputeEnergyMixt(pRegion,icg,g,gc,p,r,Yproducts,a,Eo,td)
-    Eo = Eo + 0.5_RFREAL*(u*u+v*v+w*w)    
+    Eo = Eo + 0.5_RFREAL*(u*u+v*v+w*w) + ksg
 
     IF (scalarConvFlag .EQV. .TRUE.) THEN
   CALL RFLU_ScalarConvertcvPrim2Cons(pRegion,pRegion%spec%cv,pRegion%spec%cvState)

@@ -2816,7 +2816,7 @@ SUBROUTINE RFLU_AUSMPlusUp_ComputeFlux2_MTCP(pRegion)
         ELSE
           al = SQRT((pl/rl)*(1.0_RFREAL+(gProducts-1.0_RFREAL)*YProdl))
           Hl = (pl/rl)*(1.0_RFREAL/((gProducts-1.0_RFREAL)*YProdl)+1.0_RFREAL) &
-               + 0.5_RFREAL*(ul*ul+vl*vl+wl*wl)
+               + 0.5_RFREAL*(ul*ul+vl*vl+wl*wl) + Ksg
         END IF
       END IF ! YExpl
     END IF ! global%pbaFlag 
@@ -2925,7 +2925,7 @@ SUBROUTINE RFLU_AUSMPlusUp_ComputeFlux2_MTCP(pRegion)
         ELSE
           ar = SQRT((pr/rr)*(1.0_RFREAL+(gProducts-1.0_RFREAL)*YProdr))
           Hr = (pr/rr)*(1.0_RFREAL/((gProducts-1.0_RFREAL)*YProdr)+1.0_RFREAL) &
-               + 0.5_RFREAL*(ur*ur+vr*vr+wr*wr)
+               + 0.5_RFREAL*(ur*ur+vr*vr+wr*wr) + ksg
         END IF
       END IF ! YExpl
     END IF ! global%pbaFlag 
